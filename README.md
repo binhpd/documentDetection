@@ -69,3 +69,13 @@ python3 "Pipeline With ML/main.py" list
 ```bash
 python3 "Pipeline With ML/main.py" <thư_mục_test> <số_thứ_tự> --dewarp-ml
 ```
+
+---
+
+## 3. Tài liệu Báo cáo môn học
+
+Các tài liệu lý thuyết, sơ đồ khối và đánh giá ưu/nhược điểm được lưu trữ trong thư mục `docs/`:
+
+- [Mô tả Bài toán (Lý thuyết Image Processing cơ bản)](docs/BaiToan.md)
+- [Đánh giá Giải pháp (Phân tích các ca khó & Case Limit)](docs/DanhGiaGiaiPhap.md)
+- [Workflow Chi tiết (Từng bước của Pipeline có ML)](docs/PIPELINE_WORKFLOW.md)
