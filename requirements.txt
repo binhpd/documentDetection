@@ -4,3 +4,9 @@ matplotlib>=3.7.0
 imutils>=0.5.4
 scikit-image>=0.21.0
 pytest>=7.4.0
+
+# Machine Learning Dependencies (For Pipeline With ML)
+torch>=2.0.0
+torchvision>=0.15.0
+# Note: docaligner must be installed directly from its GitHub release wheel:
+# pip install https://github.com/DocsaidLab/DocAligner/releases/download/v0.1.0/docaligner-0.1.0-py3-none-any.whl
