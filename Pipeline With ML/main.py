@@ -21,10 +21,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from step1_preprocessor import Preprocessor
-from step1_edge_detector import EdgeDetector
-from step1_hed_detector import HEDDetector
-from step1_contour_detector import ContourCornerDetector
-from step1_hough_detector import HoughCornerDetector
 from step1_ml_segmentor import MLSegmentor
 from step1_docaligner import DocAlignerSegmentor
 from step2_perspective_transform import PerspectiveTransformer
@@ -36,30 +32,16 @@ from corner_sorter import CornerSorter
 class DocumentDetector:
     """Điều phối Step 1 với chiến lược cascading fallback."""
 
-    def __init__(self, enable_ml=False, use_hed=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False):
+    def __init__(self, enable_ml=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False):
         """
         Khởi tạo DocumentDetector pipeline.
         
         Args:
             enable_ml: Có bật ML fallback không (YOLOv8)
-            use_hed: Có dùng HED Edge Detection thay cho Canny không
             use_docaligner: Sử dụng DocAligner chuyên dụng làm segmentor
             use_ml_dewarp: Sử dụng ML Dewarping phi tuyến tính thay thế Perspective Transform cho tài liệu cong
         """
         self.preprocessor = Preprocessor()
-        self.use_hed = use_hed
-        if use_hed:
-            model_dir = os.path.join(os.path.dirname(__file__), "models")
-            self.hed_detector = HEDDetector(
-                os.path.join(model_dir, "deploy.prototxt"),
-                os.path.join(model_dir, "hed_pretrained_bsds.caffemodel")
-            )
-        else:
-            self.edge_detector = EdgeDetector()
-
-        # --- Models ---
-        self.contour_detector = ContourCornerDetector()
-        self.hough_detector = HoughCornerDetector()
         
         # --- Step 2: Transformer ---
         baseline_transformer = PerspectiveTransformer()
@@ -208,13 +190,9 @@ def draw_corners(image, corners, method, ratio=1.0):
     return vis
 
 
-def show_results(orig, result, use_hed=False):
+def show_results(orig, result):
     """Hiển thị kết quả Step 1 bằng matplotlib."""
     steps = [("Ảnh gốc", orig)]
-
-    # Edges
-    edge_title = "1b. HED Edges" if use_hed else "1b. Canny Edges"
-    steps.append((edge_title, result['edged']))
 
     # ML mask (nếu có)
     if result['mask'] is not None:
@@ -299,7 +277,6 @@ def main():
     parser.add_argument("index", nargs="?", type=int, default=0, help="Số thứ tự ảnh trong thư mục (mặc định 0)")
     parser.add_argument("--force-ml", action="store_true", help="Bỏ qua Canny/Hough, ép chạy thẳng Machine Learning (YOLOv8-Seg) ở Step 1")
     parser.add_argument("--docaligner", action="store_true", help="Sử dụng mô hình DocAligner (SoTA) chuyên dụng để tìm góc vuông văn bản ở Step 1 thay cho YOLO")
-    parser.add_argument("--hed", action="store_true", help="Sử dụng mạng HED thay cho Canny Edge Detection")
     parser.add_argument("--dewarp-ml", action="store_true", help="Kích hoạt Document Dewarping bằng ML ở Step 2 (Là phẳng trang giấy cong vật lý)")
     args = parser.parse_args()
 
@@ -312,7 +289,7 @@ def main():
                 print(f"   {name:15s}  ({count} ảnh)")
             print(f"\nCách dùng: python main.py <tên_thư_mục> [số_thứ_tự]")
             print(f"           python main.py --force-ml <tên_thư_mục>")
-            print(f"           python main.py --hed <tên_thư_mục>")
+            print(f"           python main.py --docaligner <tên_thư_mục>")
             print(f"           python main.py --dewarp-ml <tên_thư_mục>")
             return
 
@@ -357,9 +334,7 @@ def main():
     elif args.force_ml:
         mode_label.append("🔴 YOLO ML ONLY")
     else:
-        mode_label.append("🟢 CV + YOLO Fallback")
-    if args.hed:
-        mode_label.append("🔴 HED Edges")
+        mode_label.append("🔴 YOLO Fallback")
     if args.dewarp_ml:
         mode_label.append("🔴 ML DEWARPING")
     
@@ -370,8 +345,8 @@ def main():
     print(f"  Mode:     {', '.join(mode_label)}")
     print(f"═══════════════════════════════════════════\n")
 
-    # ── Chạy pipeline (Hybrid) ──
-    detector = DocumentDetector(enable_ml=True, use_hed=args.hed, use_docaligner=args.docaligner, use_ml_dewarp=args.dewarp_ml)
+    # ── Chạy pipeline (Pure ML) ──
+    detector = DocumentDetector(enable_ml=True, use_docaligner=args.docaligner, use_ml_dewarp=args.dewarp_ml)
 
     # Nếu gọi theo Hybrid Force-ML (bỏ CV cơ bản)
     blurred, resized, ratio = detector.preprocessor.process(img)
@@ -395,7 +370,7 @@ def main():
     result = {
         'corners': corners * ratio if corners is not None else None,
         'method': method,
-        'edged': detector.hed_detector.detect(resized) if args.hed else detector.edge_detector.detect(blurred),
+        'edged': None,
         'blurred': blurred,
         'resized': resized,
         'ratio': ratio,
@@ -435,7 +410,7 @@ def main():
     print(f"═══════════════════════════════════════════")
     # ── Hiển thị ──
     if not args.force_ml:
-        show_results(img, result, args.hed)
+        show_results(img, result)
 
 
 if __name__ == "__main__":
