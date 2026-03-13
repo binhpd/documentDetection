@@ -55,11 +55,16 @@ def show_pipeline_results(rows, main_title="Pipeline Results"):
 
 
 def main():
-    sample_image = os.path.join(
-        os.path.dirname(__file__), "..", "Step 1 canny edge detection", "sample_receipt.jpg"
-    )
-
-    sample_image = "/Users/binhpham/Documents/Study/MSE/Xử lý ảnh Video/Bài tập cuối kỳ/Nhóm 6/image/rotate/0067.jpg"
+    if len(sys.argv) >= 3:
+        category = sys.argv[1]
+        img_idx = sys.argv[2]
+        sample_image = os.path.join(os.path.dirname(__file__), "..", "..", "image", category, f"{int(img_idx):04d}.jpg")
+    elif len(sys.argv) == 2:
+        sample_image = sys.argv[1]
+    else:
+        sample_image = os.path.join(os.path.dirname(__file__), "..", "Step 1 canny edge detection", "sample_receipt.jpg")
+        
+    print(f"File ảnh đầu vào: {sample_image}")
 
     if not os.path.exists(sample_image):
         print(f"Không tìm thấy ảnh mẫu: {sample_image}")

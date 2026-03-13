@@ -3,18 +3,25 @@ import os
 import numpy as np
 from scanner import DocumentScanner
 
+import sys
+
 def main():
     # Khởi tạo đối tượng nhận diện
     doc_scanner = DocumentScanner()
     
-    # Ở đây thay bằng đường dẫn ảnh thực tế của bạn
-    sample_image = "sample_receipt.jpg" 
+    if len(sys.argv) >= 3:
+        category = sys.argv[1]
+        img_idx = sys.argv[2]
+        sample_image = os.path.join(os.path.dirname(__file__), "..", "..", "image", category, f"{int(img_idx):04d}.jpg")
+    elif len(sys.argv) == 2:
+        sample_image = sys.argv[1]
+    else:
+        sample_image = "sample_receipt.jpg" 
+        
+    print(f"File ảnh đầu vào: {sample_image}")
     
     if not os.path.exists(sample_image):
-        print(f"Vui lòng đặt một ảnh mẫu tên là '{sample_image}' vào thư mục này để chạy thử nghiệm.")
-        # Tạo sẵn 1 ảnh mẫu xám trống để tránh lỗi crash nếu chưa có ảnh
-        cv2.imwrite(sample_image, np.ones((800, 600, 3) if 'np' in globals() else (800, 600, 3), dtype=np.uint8) * 255)
-        print(f"Đã tạo file ảnh nháp {sample_image}, vui lòng trỏ tới ảnh thật của bạn.")
+        print(f"Không tìm thấy file ảnh: '{sample_image}'")
         return
 
     print("Đang phân tích...")
