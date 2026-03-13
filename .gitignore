@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (large files)
+data/input/*.jpg
+data/input/*.png
+data/input/*.jpeg
+data/output/*.jpg
+data/output/*.png
+data/output/*.jpeg
+data/ground_truth/
+!data/input/.gitkeep
+!data/output/.gitkeep
+!data/ground_truth/.gitkeep
+
+# Environment variables
+.env
+
+# Added manually
+venv2/
+models/
+*.onnx
+*.pt
+image/
