@@ -37,11 +37,32 @@ Thư mục: `Pipeline With ML/`
 
 Đây là Pipeline rút gọn, nối tự động (End-to-End) cả 3 quá trình trên vào trong một file chạy duy nhất. Đặc biệt, nó tích hợp **Mạng nơ-ron Tích chập (CNN)** chuyên dụng giải quyết mọi nhược điểm của OpenCV truyền thống.
 
-### Yêu cầu ban đầu (Môi trường ảo):
-Pipeline này sử dụng Machine Learning nên yêu cầu kích hoạt môi trường ảo chứa các bộ thư viện hạng nặng (`torch`, `onnxruntime`, `docaligner`).
+### Hướng dẫn Cài đặt & Khởi chạy (Môi trường ML):
+Pipeline này sử dụng Machine Learning nên yêu cầu cài đặt môi trường ảo riêng biệt chứa các bộ thư viện hạng nặng (`torch`, `onnxruntime`, `docaligner`...).
+
+**Bước 1: Tạo môi trường ảo (Tuỳ chọn nhưng Khuyến nghị)**
 ```bash
-# Kích hoạt môi trường (chỉ làm 1 lần mỗi khi mở Terminal)
+# Tạo môi trường ảo tên là venv2
+python3 -m venv venv2
+```
+
+**Bước 2: Kích hoạt môi trường ảo**
+```bash
+# Trên macOS/Linux:
 source venv2/bin/activate
+# Trên Windows:
+# venv2\Scripts\activate
+```
+
+**Bước 3: Cài đặt các thư viện cơ bản**
+```bash
+pip install -r requirements.txt
+```
+
+**Bước 4: Cài đặt thư viện ML DocAligner (Bắt buộc cho tuỳ chọn --docaligner)**
+DocAligner cần được cài từ file wheel của tác giả thay vì qua pip thông thường:
+```bash
+pip install https://github.com/DocsaidLab/DocAligner/releases/download/v0.1.0/docaligner-0.1.0-py3-none-any.whl
 ```
 
 ### Các Lệnh Chạy Toàn Diện:
