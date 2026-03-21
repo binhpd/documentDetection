@@ -32,7 +32,7 @@ from corner_sorter import CornerSorter
 class DocumentDetector:
     """Điều phối Step 1 với chiến lược cascading fallback."""
 
-    def __init__(self, enable_ml=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False):
+    def __init__(self, enable_ml=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False, use_u2net=False):
         """
         Khởi tạo DocumentDetector pipeline.
         
@@ -40,6 +40,7 @@ class DocumentDetector:
             enable_ml: Có bật ML fallback không (YOLOv8)
             use_docaligner: Sử dụng DocAligner chuyên dụng làm segmentor
             use_ml_dewarp: Sử dụng ML Dewarping phi tuyến tính thay thế Perspective Transform cho tài liệu cong
+            use_u2net: Sử dụng mạng U2-Net (thư viện rembg) chuyên khoét nền lấy hình bóng giấy (triệt để nhất cho Dewarping)
         """
         self.preprocessor = Preprocessor()
         
@@ -58,6 +59,20 @@ class DocumentDetector:
 
         # --- Step 3: Enhancer ---
         self.enhancer = DocumentEnhancer()
+        
+        self.use_u2net = use_u2net
+        self.use_hed = False
+        self.edge_detector = cv2.Canny # dummy assignment just to prevent error if it gets here, actually we just skip it or fix the logic
+        
+        # We need to initialize edge_detector, contour_detector, hough_detector if they are used in detect()
+        # To make detect() work for ML, we should just let them fallback
+        class DummyDetector:
+            def detect(self, img): return cv2.Canny(img, 75, 200)
+            def find_corners(self, img): return None
+        
+        self.edge_detector = DummyDetector()
+        self.contour_detector = DummyDetector()
+        self.hough_detector = DummyDetector()
 
     def detect(self, image):
         """Phát hiện 4 góc tài liệu trong ảnh.
@@ -103,7 +118,36 @@ class DocumentDetector:
             'resized': resized,
             'ratio': ratio,
             'mask': None,
+            'u2net_doc': None
         }
+
+        # ── 1u. U2-Net (Rembg) SOTA Background Removal ──
+        if self.use_u2net:
+            print(f"[1e] 👑 Bắt đầu bóc nền bằng sức mạnh U²-Net (Rembg)...")
+            try:
+                from rembg import remove
+                # Chạy U2-net gỡ sạch nền
+                subject_orig = remove(orig)
+                alpha_orig = subject_orig[:, :, 3]
+                
+                # Khoanh đúng một hộp bounding-box vừa khít tờ giấy để loại bỏ vệt thừa 
+                x, y, w, h = cv2.boundingRect(alpha_orig)
+                subject_cropped = subject_orig[y:y+h, x:x+w]
+                
+                # Ép dán tờ giấy trơ trọi đã crop lên một background Trắng tuyệt đối (Để bảo vệ chữ khi feed vào dewarp)
+                alpha_c = subject_cropped[:, :, 3]
+                rgb_c = subject_cropped[:, :, :3]
+                white_bg = np.ones_like(rgb_c) * 255
+                mask_f = alpha_c[:, :, np.newaxis] / 255.0
+                pure_doc = (rgb_c * mask_f + white_bg * (1 - mask_f)).astype(np.uint8)
+                
+                result['u2net_doc'] = pure_doc
+                result['method'] = 'u2net'
+                result['corners'] = [] # Danh sách rỗng mồi để bypass kiểm tra errors bên dưới
+                print(f"[1e] U²-Net bóc nền & đóng khung thành công! Tờ giấy nét lượn sóng nguyên vẹn ✓")
+                return result
+            except ImportError:
+                 print("❌ Cần cài đặt rembg: pip install rembg")
 
         # ── 1c. approxPolyDP (Phương pháp chính) ──
         corners = self.contour_detector.find_corners(edged)
@@ -161,6 +205,8 @@ class DocumentDetector:
 def draw_corners(image, corners, method, ratio=1.0):
     """Vẽ 4 góc lên ảnh để hiển thị."""
     vis = image.copy()
+    if isinstance(corners, list) and len(corners) == 0:
+        return vis
     pts = corners.astype(int)
     labels = ["TL", "TR", "BR", "BL"]
     colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (255, 255, 0)]
@@ -195,16 +241,18 @@ def show_results(orig, result):
     steps = [("Ảnh gốc", orig)]
 
     # ML mask (nếu có)
-    if result['mask'] is not None:
+    if result.get('mask') is not None:
         steps.append(("1e. ML Mask", result['mask']))
 
-    # 4 góc
-    if result['corners'] is not None:
+    # Hiển thị U2-Net Extracted Document (nếu có)
+    if result.get('u2net_doc') is not None:
+        steps.append(("👑 U²-Net Doc", result['u2net_doc']))
+    elif result.get('corners') is not None:
         corners_vis = draw_corners(orig, result['corners'], result['method'])
         steps.append((f"Kết quả ({result['method']})", corners_vis))
 
-    # Step 2: Unwarped
-    if 'warped' in result and result['warped'] is not None:
+    # Step 2: Unwarped (Perspective Transform)
+    if result.get('warped') is not None:
         steps.append(("Step 2. Perspective Warp", result['warped']))
 
     # Step 3: Enhanced
@@ -257,6 +305,23 @@ def get_images_in_category(category):
         if f.endswith(('.jpg', '.png', '.jpeg'))
     ])
 
+def get_image_path(folder, index):
+    """Xác định đường dẫn ảnh đầu vào dựa trên thư mục và chỉ số."""
+    # Nếu folder là đường dẫn file tồn tại → dùng luôn
+    if os.path.isfile(folder):
+        return folder, 1
+    
+    # Xem folder có phải tên thư mục con trong image/ không
+    images = get_images_in_category(folder)
+    if images:
+        idx = min(index, len(images) - 1)
+        return images[idx], len(images)
+    else:
+        print(f"❌ Không tìm thấy ảnh hoặc thư mục: {folder}")
+        print(f"\nCác thư mục có sẵn:")
+        for name, count in list_categories():
+            print(f"   {name:15s}  ({count} ảnh)")
+        exit() # Thoát chương trình nếu không tìm thấy ảnh
 
 def main():
     import argparse
@@ -273,68 +338,54 @@ def main():
 
     # ── Parse flags ──
     parser = argparse.ArgumentParser(description="Document Detection Pipeline")
-    parser.add_argument("input", nargs="?", help="Đường dẫn ảnh, tên thư mục, hoặc 'list'")
+    parser.add_argument("folder", nargs="?", default="perspective", help="Tên thư mục con trong image/ (ví dụ: perspective, curved)")
     parser.add_argument("index", nargs="?", type=int, default=0, help="Số thứ tự ảnh trong thư mục (mặc định 0)")
     parser.add_argument("--force-ml", action="store_true", help="Bỏ qua Canny/Hough, ép chạy thẳng Machine Learning (YOLOv8-Seg) ở Step 1")
     parser.add_argument("--docaligner", action="store_true", help="Sử dụng mô hình DocAligner (SoTA) chuyên dụng để tìm góc vuông văn bản ở Step 1 thay cho YOLO")
+    parser.add_argument("--u2net", action="store_true", help="Sử dụng mô hình U²-Net (Rembg) đục 100% background để lộ rõ giấy lồi lõm trước khi đưa vào Dewarping")
     parser.add_argument("--dewarp-ml", action="store_true", help="Kích hoạt Document Dewarping bằng ML ở Step 2 (Là phẳng trang giấy cong vật lý)")
     args = parser.parse_args()
 
     # ── Xác định ảnh đầu vào ──
-    if args.input:
-        # Lệnh "list" → liệt kê thư mục
-        if args.input == "list":
-            print("📂 Các thư mục ảnh có sẵn:")
-            for name, count in list_categories():
-                print(f"   {name:15s}  ({count} ảnh)")
-            print(f"\nCách dùng: python main.py <tên_thư_mục> [số_thứ_tự]")
-            print(f"           python main.py --force-ml <tên_thư_mục>")
-            print(f"           python main.py --docaligner <tên_thư_mục>")
-            print(f"           python main.py --dewarp-ml <tên_thư_mục>")
-            return
-
-        # Nếu arg1 là đường dẫn file tồn tại → dùng luôn
-        if os.path.isfile(args.input):
-            image_path = args.input
-        else:
-            # Xem arg1 có phải tên thư mục con trong image/ không
-            images = get_images_in_category(args.input)
-            if images:
-                idx = min(args.index, len(images) - 1)
-                image_path = images[idx]
-                print(f"📂 Thư mục: {args.input} ({len(images)} ảnh), chọn ảnh #{idx}")
-            else:
-                print(f"❌ Không tìm thấy ảnh hoặc thư mục: {args.input}")
-                print(f"\nCác thư mục có sẵn:")
-                for name, count in list_categories():
-                    print(f"   {name:15s}  ({count} ảnh)")
-                return
-    else:
-        # Mặc định: lấy ảnh đầu tiên của thư mục perspective
-        default_category = "perspective"
-        images = get_images_in_category(default_category)
-        if images:
-            image_path = images[0]
-        else:
-            print("❌ Không tìm thấy ảnh mẫu. Kiểm tra thư mục image/")
-            return
-
-    if not os.path.exists(image_path):
-        print(f"❌ Không tìm thấy ảnh: {image_path}")
+    if args.folder == "list":
+        print("📂 Các thư mục ảnh có sẵn:")
+        for name, count in list_categories():
+            print(f"   {name:15s}  ({count} ảnh)")
+        print(f"\nCách dùng: python main.py <tên_thư_mục> [số_thứ_tự]")
+        print(f"           python main.py --force-ml <tên_thư_mục>")
+        print(f"           python main.py --docaligner <tên_thư_mục>")
+        print(f"           python main.py --dewarp-ml <tên_thư_mục>")
         return
 
-    # ── Đọc ảnh ──
+    image_path, total_files = get_image_path(args.folder, args.index)
+    
+    print(f"📂 Thư mục: {args.folder} ({total_files} ảnh), chọn ảnh #{args.index}")
+    
     img = cv2.imread(image_path)
+    if img is None:
+        print(f"❌ Không thể đọc ảnh: {image_path}")
+        return
+
+    orig = img.copy()
     basename = os.path.basename(image_path)
+    base_code = os.path.splitext(basename)[0]
     category = os.path.basename(os.path.dirname(image_path))
+    
+    # Chuẩn bị Data Logger lưu kết quả từng bước
+    save_dir = "result"
+    os.makedirs(save_dir, exist_ok=True)
+    save_prefix = os.path.join(save_dir, f"{category}_{base_code}")
 
     mode_label = []
-    if args.docaligner:
+    if args.u2net:
+        mode_label.append("👑 U²-Net (SOTA Background Removal)")
+    elif args.docaligner:
         mode_label.append("🔴 DocAligner SOTA")
     elif args.force_ml:
         mode_label.append("🔴 YOLO ML ONLY")
     else:
         mode_label.append("🔴 YOLO Fallback")
+        
     if args.dewarp_ml:
         mode_label.append("🔴 ML DEWARPING")
     
@@ -345,46 +396,74 @@ def main():
     print(f"  Mode:     {', '.join(mode_label)}")
     print(f"═══════════════════════════════════════════\n")
 
-    # ── Chạy pipeline (Pure ML) ──
-    detector = DocumentDetector(enable_ml=True, use_docaligner=args.docaligner, use_ml_dewarp=args.dewarp_ml)
+    # ── Chạy pipeline (Pure ML & Full Flow) ──
+    # Tích hợp trực tiếp MLDewarper (page-dewarp) làm mặc định thay vì chỉ khi có flag
+    detector = DocumentDetector(enable_ml=True, use_docaligner=args.docaligner, use_ml_dewarp=True, use_u2net=args.u2net)
 
-    # Nếu gọi theo Hybrid Force-ML (bỏ CV cơ bản)
-    blurred, resized, ratio = detector.preprocessor.process(img)
-    print(f"[1a] Tiền xử lý: {img.shape} → resize {resized.shape}  ✓")
-    
-    if args.docaligner:
-        print(f"[1b] Model Segmentation (DocAligner - State of the Art)...")
-        mask, corners = detector.docaligner_segmentor.segment(resized)
-        if corners is None:
-            # Fallback về YOLO
-            print(f"[Thuộc lòng] DocAligner lỗi, Fallback về YOLOv8.")
+    # Nếu đang bật U2-Net, hãy chạy hàm detect một cách trọn vẹn thay vì shortcut như YOLO/DocAligner
+    if args.u2net:
+        result = detector.detect(orig)
+    else:
+        # Nhánh hybrid cũ cho YOLO / DocAligner
+        blurred, resized, ratio = detector.preprocessor.process(orig)
+        print(f"[1a] Tiền xử lý: {orig.shape} → resize {resized.shape}  ✓")
+        
+        if args.docaligner:
+            print(f"[1b] Model Segmentation (DocAligner - State of the Art)...")
+            mask, corners = detector.docaligner_segmentor.segment(resized)
+            if corners is None:
+                # Fallback về YOLO
+                print(f"[Thuộc lòng] DocAligner lỗi, Fallback về YOLOv8.")
+                mask, corners = detector.ml_segmentor.segment(resized)
+                method = 'ml' if corners is not None else None
+            else:
+                method = 'docaligner'
+        else:
+            print(f"[1b] ML Segmentation (Mặc định cho Hybrid Pipeline YOLOv8)...")
             mask, corners = detector.ml_segmentor.segment(resized)
             method = 'ml' if corners is not None else None
-        else:
-            method = 'docaligner'
-    else:
-        print(f"[1b] ML Segmentation (Mặc định cho Hybrid Pipeline YOLOv8)...")
-        mask, corners = detector.ml_segmentor.segment(resized)
-        method = 'ml' if corners is not None else None
 
-    result = {
-        'corners': corners * ratio if corners is not None else None,
-        'method': method,
-        'edged': None,
-        'blurred': blurred,
-        'resized': resized,
-        'ratio': ratio,
-        'mask': mask,
-    }
+        result = {
+            'corners': corners * ratio if corners is not None else None,
+            'method': method,
+            'edged': None,
+            'blurred': blurred,
+            'resized': resized,
+            'ratio': ratio,
+            'mask': mask,
+            'u2net_doc': None,
+            'orig': orig
+        }
+
+    # === Lưu kết quả Step 1 ra ổ cứng ===
+    if result.get('blurred') is not None:
+        cv2.imwrite(f"{save_prefix}_step1_1_blurred.jpg", result['blurred'])
+    if result.get('edged') is not None:
+        cv2.imwrite(f"{save_prefix}_step1_2_edged.jpg", result['edged'])
+    if result.get('mask') is not None:
+        # Nếu mask là xám thì lưu được luôn
+        cv2.imwrite(f"{save_prefix}_step1_3_ml_mask.jpg", result['mask'])
+    if result.get('u2net_doc') is not None:
+        cv2.imwrite(f"{save_prefix}_step1_4_u2net_extracted.jpg", result['u2net_doc'])
 
     # ── Step 2: Perspective Transform / ML Dewarp ──
     print(f"\n═══════════════════════════════════════════")
-    if result['corners'] is not None:
+    if result['corners'] is not None or result.get('u2net_doc') is not None:
         print(f"\n[Step 2] Perspective Transform / Dewarping...")
         try:
-            warped = detector.transformer.dewarp(img, result['corners']) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img, result['corners'])
+            # Ưu tiên U2-Net Mask đã bóc viền nền rác rập rờn (khi U2-Net gài góc = [])
+            if result.get('u2net_doc') is not None:
+                img_for_dewarp = result['u2net_doc']
+                corners_for_dewarp = None # Tắt Perspective để bảo toàn viền dốc tự nhiên của sách
+            else:
+                img_for_dewarp = orig
+                corners_for_dewarp = result['corners']
+                
+            warped = detector.transformer.dewarp(img_for_dewarp, corners_for_dewarp) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img_for_dewarp, corners_for_dewarp)
             result['warped'] = warped
-            print(f"  ✓ Đã căn chỉnh mặt phẳng: {warped.shape[1]}x{warped.shape[0]}")
+            cv2.imwrite(f"{save_prefix}_step2_dewarped.jpg", warped)
+            
+            print(f"  ✓ Đã căn chỉnh mặt phẳng (Từ U2-Net): {warped.shape[1]}x{warped.shape[0]}" if args.u2net else f"  ✓ Đã căn chỉnh mặt phẳng: {warped.shape[1]}x{warped.shape[0]}")
             print(f"  ✅ Thành công! Phương pháp: {result['method']}")
             
             if len(result['corners']) == 4:
@@ -398,7 +477,7 @@ def main():
                 
             # ── Step 3: Enhancement ──
             print(f"\n[Step 3] Enhancement (Shadow Removal & Binarization)...")
-            enhanced = detector.enhancer.enhance(warped)
+            enhanced = detector.enhancer.enhance(warped, save_prefix=save_prefix)
             result['enhanced'] = enhanced
             print(f"  ✓ Đã tăng cường chất lượng ảnh!")
             

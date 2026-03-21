@@ -123,13 +123,20 @@ class YOLOSegmentor:
                     best_mask = masks[i]
                     print(f"[ML] → Chọn #{i} ({self.DOCUMENT_CLASSES[cls_id]}) conf={score:.2f}")
 
-        # Chiến lược 2: Fallback → lấy mask lớn nhất
+        # Chiến lược 2: Fallback → lấy mask lớn nhất (Nhưng loại trừ 'person' - class 0)
         if best_mask is None:
-            areas = [m.sum() for m in masks]
-            best_idx = int(np.argmax(areas))
-            best_mask = masks[best_idx]
-            cls_name = results[0].names.get(classes[best_idx], "unknown")
-            print(f"[ML] → Không tìm thấy 'book'. Dùng mask lớn nhất: #{best_idx} ({cls_name})")
+            # Lọc bỏ class 0 ('person') vì YOLO rất hay nhận diện nhầm tay người cầm giấy thành vật thể chính
+            valid_indices = [idx for idx, cls_id in enumerate(classes) if cls_id != 0]
+            
+            if len(valid_indices) > 0:
+                areas = [masks[idx].sum() for idx in valid_indices]
+                best_valid_idx = valid_indices[int(np.argmax(areas))]
+                best_mask = masks[best_valid_idx]
+                cls_name = results[0].names.get(classes[best_valid_idx], "unknown")
+                print(f"[ML] → Không tìm thấy 'book'. Dùng mask hợp lệ lớn nhất: #{best_valid_idx} ({cls_name})")
+            else:
+                print(f"[ML] → Chỉ tìm thấy 'person' (TAY NGƯỜI) trong ảnh. Bỏ qua để tránh cắt nhầm tay.")
+                return None, None
 
         # Chuyển mask thành binary
         mask = (best_mask * 255).astype(np.uint8)
