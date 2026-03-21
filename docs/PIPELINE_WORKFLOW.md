@@ -1,4 +1,4 @@
-# Document Scanner — Pipeline Workflow (Đầy đủ)
+# Document Scanner — Pipeline Workflow (Cập nhật theo thực tế code Pipeline With ML)
 
 > 🟢 = Image Processing &nbsp;|&nbsp; 🔴 = Machine Learning
 
@@ -6,95 +6,54 @@
 
 ## STEP 1: PHÁT HIỆN VÙNG TÀI LIỆU (Document Detection)
 
-### 1a. Resize ảnh 🟢 Image Processing
-- **Làm gì:** Thu nhỏ ảnh gốc về chiều cao cố định (500px) để tăng tốc xử lý, lưu lại tỷ lệ `ratio` để quy đổi toạ độ về ảnh gốc sau này.
-- **Input:** Ảnh màu BGR gốc từ camera (H × W × 3, uint8)
-- **Output:** Ảnh đã resize (500 × W' × 3, uint8) + giá trị `ratio = H/500`
+*Lưu ý: Khác với phương pháp xử lý ảnh (Image Processing) truyền thống dựa vào Canny và approxPolyDP, Pipeline ML thiết kế để đâm thẳng vào các mô hình học máy chuyên dụng nhằm đạt được độ chính xác tuyệt đối mà không cần qua Falling-back truyền thống.*
 
-### 1b. Chuyển xám + Làm mịn 🟢 Image Processing
-- **Làm gì:** Chuyển ảnh màu sang ảnh xám (1 kênh) rồi áp Gaussian Blur để loại bỏ nhiễu hạt, giúp bước phát hiện cạnh tiếp theo không bị nhầm nhiễu thành cạnh.
-- **Input:** Ảnh màu đã resize (500 × W' × 3, uint8)
-- **Output:** Ảnh xám đã làm mịn (500 × W' × 1, uint8)
+**Luồng A: Nhổ nền triệt để bằng U²-Net (Rembg - Mặc định cho cờ `--u2net`) 🔴 ML**
+- **Làm gì:** Dùng mạng nơ-ron học sâu U²-Net đục thủng background 100%, bảo vệ nguyên vẹn ngay cả một tờ giấy bị nhàu nát lượn sóng, không bóp méo hay ép thành 4 góc cứng nhắc. Bức ảnh được cắt và đóng lên tấm nền trắng tinh mới.
+- **Output:** Tờ giấy cong lượn tự nhiên trên nền trắng.
 
-### 1c. Phát hiện cạnh — Canny Edge Detection 🟢 Image Processing
-- **Làm gì:** Tính gradient cường độ sáng tại mỗi pixel, giữ lại những pixel có gradient đột biến (cạnh). Sử dụng ngưỡng tự động dựa trên giá trị median để thay thế ngưỡng cứng (75, 200).
-- **Input:** Ảnh xám đã blur (500 × W' × 1, uint8, giá trị 0-255)
-- **Output:** Ảnh nhị phân cạnh (500 × W' × 1, uint8, giá trị chỉ 0 hoặc 255)
-
-### 1d. Tìm 4 góc — Contour + approxPolyDP 🟢 Image Processing
-- **Làm gì:** Tìm tất cả đường bao khép kín (contour) trên ảnh cạnh, sắp xếp theo diện tích giảm dần, lấy 5 contour lớn nhất. Với mỗi contour, xấp xỉ thành đa giác (Douglas-Peucker). Nếu đa giác có đúng 4 đỉnh → đó là viền tờ giấy.
-- **Input:** Ảnh nhị phân cạnh (500 × W' × 1, 0/255)
-- **Output:** Mảng 4 toạ độ góc `(4, 2) float32` — hoặc `None` nếu không tìm được
-
-### 1e. Fallback — Hough Line Transform + Line Intersection 🟢 Image Processing
-- **Khi nào chạy:** Chỉ khi bước 1d thất bại (trả về `None` — ví dụ góc bị tay che, viền đứt đoạn).
-- **Làm gì:** Dùng biến đổi Hough tìm tất cả đoạn thẳng trên ảnh cạnh. Gom cụm các đoạn thẳng thành 4 nhóm (Trên/Dưới/Trái/Phải) dựa trên góc nghiêng và vị trí. Tính giao điểm toán học của 4 cặp đường để thu được 4 góc ảo (ngay cả khi góc vật lý bị che khuất).
-- **Input:** Ảnh nhị phân cạnh (500 × W' × 1, 0/255)
-- **Output:** Mảng 4 toạ độ giao điểm `(4, 2) float32` — hoặc `None` nếu không đủ thông tin
-
-### 1f. Fallback cuối — Document Segmentation 🔴 Machine Learning
-- **Khi nào chạy:** Chỉ khi cả bước 1d và 1e đều thất bại (nền quá phức tạp, giấy cùng tông màu với nền, hoặc giấy bị cong/nhăn không có cạnh thẳng nào).
-- **Làm gì:** Dùng mạng nơ-ron (U-Net hoặc YOLOv8-Seg) đã được huấn luyện trên ảnh tài liệu để phân vùng ngữ nghĩa — mạng tô màu từng pixel: "là giấy" hoặc "không phải giấy". Sau đó dùng `minAreaRect` hoặc Hough Lines trên mask này để trích 4 góc.
-- **Input:** Ảnh màu đã resize (500 × W' × 3, uint8)
-- **Output:** Mask nhị phân vùng giấy (500 × W' × 1, 0/255) → trích ra 4 toạ độ góc `(4, 2) float32`
+**Luồng B: Trích xuất góc ML Segmentation (DocAligner / YOLOv8 - Chế độ lai) 🔴 ML**
+- 1a. *Tiền xử lý 🟢*: Thu nhỏ ảnh, mờ Gaussian để dễ phân tích bề mặt.
+- 1b. *Phân đoạn AI 🔴*: Thay vì dùng Hough Lines thủ công, hệ thống dùng **DocAligner** chuyên dụng để nội suy 4 viền cực khít. Nếu máy không cài DocAligner, mã nguồn lùi về **YOLOv8 Segmentation** bao quanh vùng mặt nạ giấy, từ đó nội suy lấn vẽ đa giác thu gom 4 tọa độ góc.
+- **Output:** Mảng 4 tọa độ góc trên khung ảnh hiện tại, kèm theo Mask nhị phân.
 
 ---
 
-## STEP 2: BIẾN ĐỔI HÌNH HỌC (Geometric Transformation)
+## STEP 2: BIẾN ĐỔI HÌNH HỌC VÀ LÀM PHẲNG (Geometric & Dewarping)
 
-### 2a. Sắp xếp 4 góc (Corner Sorting) 🟢 Image Processing
-- **Làm gì:** Sắp xếp 4 điểm lộn xộn thành thứ tự cố định [Top-Left, Top-Right, Bottom-Right, Bottom-Left] dựa trên tổng (x+y) và hiệu (y−x). Nhân toạ độ với `ratio` để quy về kích thước ảnh gốc.
-- **Input:** 4 toạ độ góc chưa sắp xếp `(4, 2) float32`
-- **Output:** 4 toạ độ đã sắp xếp `[TL, TR, BR, BL]` `(4, 2) float32` trên ảnh gốc
+### 2a. Perspective Transform (Biến đổi phối cảnh vuông góc) 🟢 Image Processing
+- **Khi nào chạy:** Khi bước 1 chạy bằng Luồng B (Trích xuất 4 góc của YOLO/DocAligner).
+- **Làm gì:** Tính ra ma trận 3x3 và dùng `warpPerspective` để kéo màn hình chéo lật nghiêng thành khung chữ nhật chuẩn hóa chính diện.
+- **Lưu ý:** Nếu hệ thống chạy bằng Luồng A (bóc mặt nạ U²-Net), bước biến đổi Phối cảnh này sẽ cố ý bị loại bỏ để bảo toàn dốc độ cong lượn vật lý nguyên bản cho quá trình ủi dòng ở 2b.
+- **Output:** Ảnh tài liệu duỗi màn hình ngang dọc nhìn đối xứng tuyến tính.
 
-### 2b. Perspective Transform (Biến đổi phối cảnh) 🟢 Image Processing
-- **Làm gì:** Tính ma trận biến đổi phối cảnh 3×3 ánh xạ 4 góc nghiêng → 4 góc chữ nhật. Áp dụng `warpPerspective` để "kéo phẳng" tờ giấy thành ảnh chữ nhật nhìn thẳng (bird's-eye view).
-- **Input:** Ảnh gốc đầy đủ (H × W × 3, uint8) + 4 góc đã sắp xếp `(4, 2) float32`
-- **Output:** Ảnh tài liệu đã duỗi phẳng, hình chữ nhật (maxH × maxW × 3, uint8)
-
-### 2c. Document Dewarping (Tuỳ chọn) 🔴 Machine Learning
-- **Khi nào chạy:** Khi phát hiện tài liệu bị cong/nhăn (trang sách mở, giấy bị gấp, giấy nhàu). Có thể phát hiện bằng cách kiểm tra độ cong của contour hoặc dùng heuristic.
-- **Làm gì:** Dùng mạng nơ-ron (FDRNet / DewarpNet / DocUNet / GeoTr) dự đoán bản đồ pixel-wise remapping. Thay vì chỉ biến đổi tuyến tính 4 góc, mạng dự đoán hàng nghìn điểm điều khiển (control points) trên lưới dày đặc, sau đó dùng phép biến đổi Thin-Plate Spline (TPS) để duỗi phẳng từng vùng nhỏ một cách phi tuyến.
-- **Input:** Ảnh tài liệu bị cong (maxH × maxW × 3, uint8)
-- **Output:** Ảnh tài liệu đã duỗi phẳng hoàn toàn (H' × W' × 3, uint8)
+### 2b. Text-line Dewarping (Phân tích nén phẳng trục dòng chữ) 🔴 Machine Learning
+- **Khi nào chạy:** Tự động kích hoạt nối gót 2a hoặc 1a nếu có sự hiện diện của thư viện `page-dewarp`.
+- **Làm gì:** Mô hình AI phân tích độ võng/bẻ lượn cong vút của từng hàng chữ bên trong trang sách cuốn mép. Từ đó, xây dựng một vòm lưới Spline lặn ngược để nắn/bẻ đảo chiều uốn cong của từng pixel mảnh giấy.
+- **Output:** Tờ giấy phẳng lỳ như vừa được kẹp bàn ủi nhiệt độ cao. (Nếu model không gắn được file weights, hoặc lỗi phân tích, kết quả tự động rơi thẳng về mốc ảnh 2a).
 
 ---
 
 ## STEP 3: TĂNG CƯỜNG CHẤT LƯỢNG (Image Enhancement)
 
-### 3a. Loại bỏ bóng đổ (Shadow Removal) 🟢 Image Processing
-- **Làm gì:** Chuyển ảnh sang xám. Dùng Morphological Close với kernel lớn (21×21) để ước lượng "bản đồ ánh sáng nền" (mọi nét chữ bị xoá, chỉ còn gradient bóng). Sau đó chia ảnh gốc cho bản đồ nền → bóng đổ bị triệt tiêu.
-- **Input:** Ảnh tài liệu đã warp (maxH × maxW × 3, uint8)
-- **Output:** Ảnh xám không bóng, ánh sáng đồng đều (maxH × maxW × 1, uint8)
+### 3a. Khôi phục lóa sáng Flash (Glare Removal/In-painting) 🟢 Image Processing
+- **Làm gì:** Chuyển xám và phân ngưỡng mức cực cao (>250) để tách vùng đốm trắng lóa do Flash điện thoại. Nếu đốm sáng nhỏ (< 5% trang giấy), thuật toán `cv2.inpaint` sẽ nội suy vá tự động phục dựng vùng giấy bị mù chữ dựa vào pixel lân cận.
+- **Output:** Loại bỏ đốm lóa chói sáng trên mặt giấy bóng cứng.
 
-### 3b. Cân bằng tương phản — CLAHE 🟢 Image Processing
-- **Làm gì:** Áp dụng CLAHE (Contrast Limited Adaptive Histogram Equalization). Chia ảnh thành lưới 8×8 tile, mỗi tile cân bằng histogram riêng biệt để tăng tương phản cục bộ. Clip limit giới hạn mức khuếch đại để tránh quá sáng.
-- **Input:** Ảnh xám đã loại bóng (maxH × maxW × 1, uint8)
-- **Output:** Ảnh xám tương phản cao, chữ đen rõ trên nền trắng (maxH × maxW × 1, uint8)
+### 3b. Chống Rung Nhoè nét chữ (Unsharp Masking/Deblurring) 🟢 Image Processing
+- **Làm gì:** Sửa lỗi Motion Blur do người dùng chụp bị rung tay vòng lấy nét (AF) lỏng. Trừ ảnh hiện tại cho bản nhòe Gaussian (`addWeighted` kéo biên độ) nhằm khuếch đại nếp gấp viền.
+- **Output:** Kéo viền mép chữ trở nên sắc như dao cạo, khôi phục độ rõ cho sợi mực.
 
-### 3c. Nhị phân hoá — Adaptive Thresholding 🟢 Image Processing
-- **Làm gì:** Chuyển ảnh xám thành ảnh 2 màu (đen/trắng). Mỗi vùng nhỏ (blockSize × blockSize pixel) tự tính ngưỡng riêng dựa trên trung bình Gaussian có trọng số, trừ đi hằng số C. Pixel sáng hơn ngưỡng → trắng (nền), tối hơn → đen (chữ).
-- **Input:** Ảnh xám tương phản cao (maxH × maxW × 1, uint8, giá trị 0-255)
-- **Output:** Ảnh nhị phân (maxH × maxW × 1, uint8, giá trị chỉ 0 hoặc 255)
+### 3c. Khử bóng loang lổ (Division-based Shadow Normalization) 🟢 Image Processing
+- **Làm gì:** Áp dụng mảng Division-based Illumination. Dùng `MORPH_CLOSE` kernel lớn (21x21) ăn mòn mất gốc chữ đen, chỉ giữ lại độ râm tạo thành "Bản đồ phông nền" khuếch tán. Đem từng Pixel thực tế chia cho Bản đồ nền này (x255) khiến các mảng bóng tối tự dội ngược tỷ lệ sáng lên đồng đều với toàn trang.
+- **Output:** Bức ảnh xám với ánh sáng tờ giấy dàn phân bổ hoàn hảo không gợn bóng tay.
 
-### 3d. Làm sạch hình thái học — Morphological Cleaning 🟢 Image Processing
-- **Làm gì:** Opening (erode → dilate): Xoá các chấm nhiễu nhỏ hơn kernel. Closing (dilate → erode): Lấp các lỗ hổng nhỏ trong nét chữ. Kết quả là ảnh scan sạch, nét chữ liền mạch.
-- **Input:** Ảnh nhị phân có nhiễu (maxH × maxW × 1, 0/255)
-- **Output:** ✅ **Ảnh tài liệu sạch cuối cùng** (maxH × maxW × 1, 0/255)
-
-### 3e. Deep Binarization (Tuỳ chọn, thay thế 3a-3d) 🔴 Machine Learning
-- **Khi nào chạy:** Khi tài liệu bị suy thoái nặng (ố vàng, nhàu nát, chữ viết tay mờ, watermark, stain). Adaptive Threshold không phân biệt được "vết bẩn" với "chữ".
-- **Làm gì:** Dùng mạng nơ-ron (DocEnTr — Vision Transformer, hoặc DE-GAN — Generative Adversarial Network) đã được huấn luyện trên dataset DIBCO. Mạng học cách nhận biết "đâu là chữ" ở mức ngữ nghĩa, bỏ qua vết bẩn, bóng, watermark. Thay thế toàn bộ 3a→3d bằng 1 bước duy nhất.
-- **Input:** Ảnh xám tài liệu (maxH × maxW × 1, uint8)
-- **Output:** Ảnh nhị phân sạch (maxH × maxW × 1, 0/255)
+### 3d. Binarization Toàn cục (Global Otsu Thresholding) 🟢 Image Processing
+- **Làm gì:** Vì bước 3c đã giải quyết triệt để sự cố bóng hắt (Shadow), thao tác chốt hạ sử dụng phương pháp **Global Otsu Thresholding** (Thay vì phương pháp khoanh cửa sổ Adaptive quá gắt làm bào mòn và bẻ gãy nét mỏng). Otsu giáng 1 đường chẻ đôi rành mạch các Pixel Mực In xuống Trắng/Đen tuyệt đối dựa vào chính histogram chuẩn.
+- **Output:** ✅ **Ảnh tài liệu scan (Mực đen, Giấy trắng) rành mạch nguyên gốc, chữ không gãy nát, không vỡ mảnh**.
 
 ---
 
-## Tổng kết
+## Tổng kết cơ chế tích hợp ML
 
-| Phân loại | Số bước | Các bước | Vai trò |
-|---|---|---|---|
-| 🟢 **Image Processing** | **10 bước** | 1a, 1b, 1c, 1d, 1e, 2a, 2b, 3a, 3b, 3c, 3d | **Pipeline chính** — hoạt động độc lập, không cần ML |
-| 🔴 **Machine Learning** | **3 bước** | 1f, 2c, 3e | **Fallback / Tuỳ chọn** — chỉ bật khi Image Processing thất bại |
-
-> Pipeline **mặc định chạy hoàn toàn bằng Image Processing**. Các bước Machine Learning là **tuỳ chọn nâng cao**, chỉ kích hoạt khi gặp điều kiện ảnh cực đoan mà thuật toán truyền thống không xử lý được.
+Bằng việc lồng Mạng Nơ-ron (Rembg/U2Net/DocAligner/YOLO) vào **Bước 1**, và Trí tuệ AI vuốt nếp dòng chữ vào **Bước 2**, Pipeline xử lý ảnh truyền thống trước đây đã được lột xác trở thành 1 hệ thống **Front-line Machine Learning chuyên sâu**. Thay vì mò mẫm vẽ đường bờ bao bằng xử lý điểm ảnh OpenCV dễ trật nhịp, Machine Learning đánh chặn ngay vào não điểm ảnh, đẩy OpenCV (Bước 3) về vị trí Tăng Cường Sinh Học đầu cuối mang lại một hệ thống Scanner App chuẩn hóa quốc tế mạnh mẽ.
