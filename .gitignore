@@ -48,3 +48,4 @@ models/
 *.onnx
 *.pt
 image/
+result/
