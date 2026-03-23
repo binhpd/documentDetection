@@ -33,11 +33,30 @@ class DocumentEnhancer:
         if save_prefix is not None:
             cv2.imwrite(f"{save_prefix}_step3_3_noshadow.jpg", normalized_img)
         
-        print("[Step 3] ✒️ Binarize thông minh: Nối nét & Xóa thấm mặt sau...")
-        final_img = self.smart_binarize(normalized_img)
-        if save_prefix is not None:
-            cv2.imwrite(f"{save_prefix}_step3_4_final_enhanced.jpg", final_img)
+        print("[Step 3] ✒️ Binarize thông minh (Phơi sáng mềm)... đang tạo 5 mức độ để lựa chọn")
         
+        # 5 Cặp tham số tương quan (Black Point, White Point)
+        threshold_pairs = [
+            (90, 220),   # Option 1: Rất mềm mại (Nhiều hạt xám, như bút chì nét nhạt)
+            (110, 200),  # Option 2: Cân bằng tiêu chuẩn (Đủ đen gắt, giữ viền mượt)
+            (130, 190),  # Option 3: Chữ mạnh, nền trắng phau
+            (160, 180),  # Option 4: Cực gắt (Chữ đen đậm thui, lằn ranh xám mỏng, gần như B/W cũ)
+            (70, 150)    # Option 5: Phơi sáng chói (Tẩy trắng nền cực mạnh, giữ lại chữ vừa in)
+        ]
+        
+        final_img = None
+        for i, (bp, wp) in enumerate(threshold_pairs, 1):
+            soft_bin = self.smart_binarize(normalized_img, black_point=bp, white_point=wp)
+            # Nếu chạy trên app có lưu cache ảnh 
+            if save_prefix is not None:
+                filename = f"{save_prefix}_step3_4_opt{i}_B{bp}_W{wp}.jpg"
+                cv2.imwrite(filename, soft_bin)
+                print(f"  -> Lưu mẫu thử Option {i} (Đen:{bp}, Trắng:{wp}) ra {filename}")
+            
+            # Tạm khóa Option 2 làm chuẩn bị mặc định trả về cho Matplotlib show()
+            if i == 2: 
+                final_img = soft_bin
+                
         return final_img
 
     def remove_glare(self, image):
@@ -90,16 +109,24 @@ class DocumentEnhancer:
         
         return normalized_gray
 
-    def smart_binarize(self, gray_image):
+    def smart_binarize(self, gray_image, black_point=110.0, white_point=200.0):
         """
-        [ĐÃ SỬA THEO YÊU CẦU: BỎ XÓA THẤM MẶT SAU]
-        Bỏ phương pháp Adaptive Threshold (bộ phận cắt gọt từng vùng nhỏ để xóa thấm, làm mòn chữ lờ mờ).
-        Sử dụng phương pháp Global Otsu Thresholding lấy 1 ngưỡng đen trắng chung do phông nền đã được làm trắng đều từ bước Shadow Normalization (3.3).
+        [ĐÃ SỬA THEO YÊU CẦU: SOFT BINARIZATION]
+        Giữ lại các pixel xám mượt ở biên chữ (anti-aliasing) để tránh gai vỡ hay đứt chữ mảnh.
+        Ép vùng lõi chữ thành Đen nhánh và nền thành Trắng tinh dựa trên Point Thresholds.
         """
-        # Dùng Otsu binarization
-        _, binary = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        # Xác định điểm Đen (Black Point) và điểm Trắng (White Point)
+        # Pixel <= black_point sẽ chuyển thành 0 (Đen tuyệt đối)
+        # Pixel >= white_point sẽ chuyển thành 255 (Trắng tuyệt đối)
+        # Vùng ở giữa biến thành xám trung gian làm mượt rìa chữ.
         
-        return binary
+        # Phép chiếu biến đổi tuyến tính (Linear Contrast Stretching)
+        stretched = (gray_image.astype(np.float32) - float(black_point)) * (255.0 / float(white_point - black_point))
+        
+        # Cắt gọt chuẩn hóa kết quả vào dải uint8 (0-255)
+        soft_binary = np.clip(stretched, 0, 255).astype(np.uint8)
+        
+        return soft_binary
 
 if __name__ == "__main__":
     print("Test Enhancement...")
