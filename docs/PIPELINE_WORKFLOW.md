@@ -48,9 +48,18 @@
 - **Làm gì:** Áp dụng mảng Division-based Illumination. Dùng `MORPH_CLOSE` kernel lớn (21x21) ăn mòn mất gốc chữ đen, chỉ giữ lại độ râm tạo thành "Bản đồ phông nền" khuếch tán. Đem từng Pixel thực tế chia cho Bản đồ nền này (x255) khiến các mảng bóng tối tự dội ngược tỷ lệ sáng lên đồng đều với toàn trang.
 - **Output:** Bức ảnh xám với ánh sáng tờ giấy dàn phân bổ hoàn hảo không gợn bóng tay.
 
-### 3d. Binarization Toàn cục (Global Otsu Thresholding) 🟢 Image Processing
-- **Làm gì:** Vì bước 3c đã giải quyết triệt để sự cố bóng hắt (Shadow), thao tác chốt hạ sử dụng phương pháp **Global Otsu Thresholding** (Thay vì phương pháp khoanh cửa sổ Adaptive quá gắt làm bào mòn và bẻ gãy nét mỏng). Otsu giáng 1 đường chẻ đôi rành mạch các Pixel Mực In xuống Trắng/Đen tuyệt đối dựa vào chính histogram chuẩn.
-- **Output:** ✅ **Ảnh tài liệu scan (Mực đen, Giấy trắng) rành mạch nguyên gốc, chữ không gãy nát, không vỡ mảnh**.
+### 3d. Phơi sáng mềm (Soft Binarization / Linear Contrast Stretching) 🟢 Image Processing
+- **Làm gì:** Việc dùng binarize gắt (Otsu hay Adaptive) thường chém đứt pixel xám ở viền, dãn đến nét mảnh bị vỡ rỗ, gai (jagged edges) và lấp mất độ nét thanh nét đậm. Pipeline chuyển sang áp dụng **Kéo giãn tương phản tuyến tính** định vị ngưỡng 1 phần (Piecewise Linear) thông qua 2 chốt Black Point (Ngưỡng đen) & White Point (Ngưỡng trắng):
+  - Giá trị màu `≤ Black Point`: Kéo sập thành `0` (Đen nhánh lõi chữ).
+  - Giá trị màu `≥ White Point`: Kích trần thành `255` (Trắng tinh tẩy bụi).
+  - Khoảng giới hạn giữa: Duỗi thành dải xám mềm hoạt động như bộ khử răng cưa (Anti-aliasing), bảo toàn form chữ tròn vẹn.
+- **Tiêu chuẩn các Ngưỡng (Options) đang cài đặt trong mã nguồn:**
+  - `Option 2 (B:110, W:200)`: **[Đang chọn mặc định]** Cân bằng tiêu chuẩn (Đen lõi gắt, xám viền ôm mờ đủ giữ nét chữ mềm mại nguyên vẹn không đứt).
+  - `Option 1 (B:90, W:220)`: Siêu mềm mại (Xám sâu, văn bản ngả về màu chì nhẹ, độ rung rìa rộng).
+  - `Option 3 (B:130, W:190)`: Cân bằng đẩy đen (Nền trắng phau nhưng lôi bật các dải mực lờ mờ/phai thành đen nhánh). 
+  - `Option 4 (B:160, W:180)`: Rất gắt (Gần như Otsu, khung xám mỏng như dao lam, mép chữ thui lại nhưng sẽ gai nhẹ).
+  - `Option 5 (B:70, W:150)`: Phơi sáng bão hòa (Tẩy lóa trắng nền mạnh, nhưng chữ mỏng).
+- **Output:** ✅ **Ảnh tài liệu đạt chất lượng scanner chuẩn (Nền trắng lóa, viền chữ có bóng mờ lót êm ái chống vỡ nát)**.
 
 ---
 
