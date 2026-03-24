@@ -17,6 +17,10 @@ Usage:
 import cv2
 import sys
 import os
+
+# Fix incompatible architecture error for M-series Macs regarding libturbojpeg
+os.environ["TURBOJPEG"] = "/opt/homebrew/opt/jpeg-turbo/lib/libturbojpeg.dylib"
+
 import numpy as np
 import matplotlib.pyplot as plt
 

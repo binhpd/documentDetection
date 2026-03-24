@@ -83,6 +83,11 @@ class MLDewarper:
             config = Config()
             config.NO_BINARY = 1 # Không xuất ảnh nhị phân vì Pipeline có bước Binarization riêng
             
+            # Khắc phục lỗi xén mép ảnh: Step 1 và Step 2 PerspectiveTransform đã crop cắt nền rất khít,
+            # nên page-dewarp không cần (và không được) tự động cắt thêm margin nữa.
+            config.PAGE_MARGIN_X = 0
+            config.PAGE_MARGIN_Y = 0
+            
             # Cấu hình giảm log nếu cần thiết (1 là cảnh báo, 0 là tắt)
             config.DEBUG_LEVEL = 0
             
