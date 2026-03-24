@@ -28,9 +28,14 @@
 - **Output:** Ảnh tài liệu duỗi màn hình ngang dọc nhìn đối xứng tuyến tính.
 
 ### 2b. Text-line Dewarping (Phân tích nén phẳng trục dòng chữ) 🔴 Machine Learning
-- **Khi nào chạy:** Tự động kích hoạt nối gót 2a hoặc 1a nếu có sự hiện diện của thư viện `page-dewarp`.
+- **Khi nào chạy:** Tự động kích hoạt nối gót 2a hoặc 1a nếu có sự hiện diện của thư viện `page-dewarp` (cờ `--dewarp-ml`).
 - **Làm gì:** Mô hình AI phân tích độ võng/bẻ lượn cong vút của từng hàng chữ bên trong trang sách cuốn mép. Từ đó, xây dựng một vòm lưới Spline lặn ngược để nắn/bẻ đảo chiều uốn cong của từng pixel mảnh giấy.
 - **Output:** Tờ giấy phẳng lỳ như vừa được kẹp bàn ủi nhiệt độ cao. (Nếu model không gắn được file weights, hoặc lỗi phân tích, kết quả tự động rơi thẳng về mốc ảnh 2a).
+
+### 2c. Neural Grid-based Document Unwarping (UVDoc) 🔴 Machine Learning
+- **Khi nào chạy:** Khi người dùng truyền cờ `--uvdoc` (thường kết hợp với `--u2net`).
+- **Làm gì:** Trái với Text-line Dewarping chỉ dựa vào chữ, **UVDoc** sử dụng Mạng Nơ-ron Đa lớp (ResNet) phân tích tài liệu để dự đoán ra một lưới tọa độ điểm 2D/3D (Neural Grid) biểu diễn độ nhăn nheo, cong vênh sọc dưa sâu sắc trên toàn bộ diện tích giấy. Từ lưới này áp dụng Bilinear Unwarping nội suy nắn phẳng cấu trúc vật lý tờ giấy.
+- **Output:** Khôi phục nguyên vẹn tỷ lệ tài liệu phẳng phiu hoàn hảo mà không hề cắt lẹm vào viền lề giấy như phương pháp đếm chữ của `page-dewarp`. Tốc độ có thể chậm hơn nhưng độ vẹn toàn cao nhất.
 
 ---
 

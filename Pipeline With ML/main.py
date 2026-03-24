@@ -29,6 +29,7 @@ from step1_ml_segmentor import MLSegmentor
 from step1_docaligner import DocAlignerSegmentor
 from step2_perspective_transform import PerspectiveTransformer
 from step2_ml_dewarper import MLDewarper
+from step2_uvdoc_dewarper import UVDocDewarper
 from step3_enhancer import DocumentEnhancer
 from corner_sorter import CornerSorter
 
@@ -36,7 +37,7 @@ from corner_sorter import CornerSorter
 class DocumentDetector:
     """Điều phối Step 1 với chiến lược cascading fallback."""
 
-    def __init__(self, enable_ml=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False, use_u2net=False):
+    def __init__(self, enable_ml=False, use_docaligner=False, yolo_model="models/yolov8n-seg.pt", unet_model="models/unet_doc.pt", use_ml_dewarp=False, use_u2net=False, use_uvdoc=False):
         """
         Khởi tạo DocumentDetector pipeline.
         
@@ -45,18 +46,22 @@ class DocumentDetector:
             use_docaligner: Sử dụng DocAligner chuyên dụng làm segmentor
             use_ml_dewarp: Sử dụng ML Dewarping phi tuyến tính thay thế Perspective Transform cho tài liệu cong
             use_u2net: Sử dụng mạng U2-Net (thư viện rembg) chuyên khoét nền lấy hình bóng giấy (triệt để nhất cho Dewarping)
+            use_uvdoc: Sử dụng mạng UVDoc để tính toán lưới nắn cong giấy
         """
         self.preprocessor = Preprocessor()
         
         # --- Step 2: Transformer ---
         baseline_transformer = PerspectiveTransformer()
-        if use_ml_dewarp:
+        if use_uvdoc:
+            self.transformer = UVDocDewarper(fallback_transformer=baseline_transformer)
+        elif use_ml_dewarp:
             self.transformer = MLDewarper(fallback_transformer=baseline_transformer)
         else:
             self.transformer = baseline_transformer
             
         self.enable_ml = enable_ml
         self.use_docaligner = use_docaligner
+        self.use_uvdoc = use_uvdoc
         
         self.ml_segmentor = MLSegmentor(yolo_model, unet_model) if enable_ml else None
         self.docaligner_segmentor = DocAlignerSegmentor() if use_docaligner else None
@@ -134,21 +139,52 @@ class DocumentDetector:
                 subject_orig = remove(orig)
                 alpha_orig = subject_orig[:, :, 3]
                 
-                # Khoanh đúng một hộp bounding-box vừa khít tờ giấy để loại bỏ vệt thừa 
-                x, y, w, h = cv2.boundingRect(alpha_orig)
-                subject_cropped = subject_orig[y:y+h, x:x+w]
-                
+                # Tìm 4 góc tài liệu từ mask trong suốt (alpha_orig)
+                contours, _ = cv2.findContours(alpha_orig, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                corners = None
+                if contours:
+                    largest = max(contours, key=cv2.contourArea)
+                    # C2: Dùng approxPolyDP lặp dần để bắt 4 mép thẳng của tờ giấy (bỏ qua những điểm nhấp nhô của ngón tay)
+                    corners = None
+                    peri = cv2.arcLength(largest, True)
+                    # Thử các mức độ "đơn giản hóa đa giác" từ mịn đến thô
+                    for eps in np.linspace(0.01, 0.1, 10):
+                        approx = cv2.approxPolyDP(largest, eps * peri, True)
+                        if len(approx) == 4:
+                            corners = approx.reshape(4, 2).astype(np.float32)
+                            break
+                            
+                    # Nếu approxPolyDP vẫn không tìm được tứ giác (do bàn tay che lấp quá nhiều), 
+                    # fallback dùng Extreme Points an toàn hơn minAreaRect
+                    if corners is None:
+                        pts = largest.reshape(-1, 2)
+                        s = pts.sum(axis=1) # x + y
+                        diff = np.diff(pts, axis=1) # y - x
+                        corners = np.array([
+                            pts[np.argmin(s)],
+                            pts[np.argmin(diff)],
+                            pts[np.argmax(s)],
+                            pts[np.argmax(diff)]
+                        ], dtype=np.float32)
+
                 # Ép dán tờ giấy trơ trọi đã crop lên một background Trắng tuyệt đối (Để bảo vệ chữ khi feed vào dewarp)
-                alpha_c = subject_cropped[:, :, 3]
-                rgb_c = subject_cropped[:, :, :3]
+                alpha_c = subject_orig[:, :, 3]
+                rgb_c = subject_orig[:, :, :3]
                 white_bg = np.ones_like(rgb_c) * 255
                 mask_f = alpha_c[:, :, np.newaxis] / 255.0
                 pure_doc = (rgb_c * mask_f + white_bg * (1 - mask_f)).astype(np.uint8)
                 
                 result['u2net_doc'] = pure_doc
+                result['u2net_mask'] = alpha_orig
                 result['method'] = 'u2net'
-                result['corners'] = [] # Danh sách rỗng mồi để bypass kiểm tra errors bên dưới
-                print(f"[1e] U²-Net bóc nền & đóng khung thành công! Tờ giấy nét lượn sóng nguyên vẹn ✓")
+                result['corners'] = corners if corners is not None else []
+                if len(result['corners']) == 4:
+                    try:
+                        from corner_sorter import sort_corners
+                        result['corners'] = sort_corners(result['corners'])
+                    except ImportError:
+                        pass
+                print(f"[1e] U²-Net bóc nền & tìm góc thành công! ✓")
                 return result
             except ImportError:
                  print("❌ Cần cài đặt rembg: pip install rembg")
@@ -251,9 +287,14 @@ def show_results(orig, result):
     # Hiển thị U2-Net Extracted Document (nếu có)
     if result.get('u2net_doc') is not None:
         steps.append(("👑 U²-Net Doc", result['u2net_doc']))
-    elif result.get('corners') is not None:
+        
+    # Luôn hiển thị 4 góc trên ảnh gốc nếu tìm thấy
+    if result.get('corners') is not None and len(result['corners']) > 0:
         corners_vis = draw_corners(orig, result['corners'], result['method'])
         steps.append((f"Kết quả ({result['method']})", corners_vis))
+
+    if result.get('coons_warped') is not None:
+        steps.append(("Chữ nhật hoá viền cong (Coons Patch)", result['coons_warped']))
 
     # Step 2: Unwarped (Perspective Transform)
     if result.get('warped') is not None:
@@ -347,6 +388,7 @@ def main():
     parser.add_argument("--force-ml", action="store_true", help="Bỏ qua Canny/Hough, ép chạy thẳng Machine Learning (YOLOv8-Seg) ở Step 1")
     parser.add_argument("--docaligner", action="store_true", help="Sử dụng mô hình DocAligner (SoTA) chuyên dụng để tìm góc vuông văn bản ở Step 1 thay cho YOLO")
     parser.add_argument("--u2net", action="store_true", help="Sử dụng mô hình U²-Net (Rembg) đục 100% background để lộ rõ giấy lồi lõm trước khi đưa vào Dewarping")
+    parser.add_argument("--uvdoc", action="store_true", help="Sửa cong rách nát tài liệu bằng Neural Grid UVDoc (chuyên dụng xử lý độ cong sâu sắc)")
     parser.add_argument("--dewarp-ml", action="store_true", help="Kích hoạt Document Dewarping bằng ML ở Step 2 (Là phẳng trang giấy cong vật lý)")
     args = parser.parse_args()
 
@@ -390,7 +432,9 @@ def main():
     else:
         mode_label.append("🔴 YOLO Fallback")
         
-    if args.dewarp_ml:
+    if args.uvdoc:
+        mode_label.append("🔴 UVDOC NEURAL DEWARP")
+    elif args.dewarp_ml:
         mode_label.append("🔴 ML DEWARPING")
     
     print(f"═══════════════════════════════════════════")
@@ -402,7 +446,7 @@ def main():
 
     # ── Chạy pipeline (Pure ML & Full Flow) ──
     # Tích hợp trực tiếp MLDewarper (page-dewarp) làm mặc định thay vì chỉ khi có flag
-    detector = DocumentDetector(enable_ml=True, use_docaligner=args.docaligner, use_ml_dewarp=True, use_u2net=args.u2net)
+    detector = DocumentDetector(enable_ml=True, use_docaligner=args.docaligner, use_ml_dewarp=args.dewarp_ml, use_u2net=args.u2net, use_uvdoc=args.uvdoc)
 
     # Nếu đang bật U2-Net, hãy chạy hàm detect một cách trọn vẹn thay vì shortcut như YOLO/DocAligner
     if args.u2net:
@@ -455,15 +499,32 @@ def main():
     if result['corners'] is not None or result.get('u2net_doc') is not None:
         print(f"\n[Step 2] Perspective Transform / Dewarping...")
         try:
-            # Ưu tiên U2-Net Mask đã bóc viền nền rác rập rờn (khi U2-Net gài góc = [])
+            # Khi dùng U2-Net, ảnh 'u2net_doc' đã được xóa background rác và ghép nền trắng,
+            # Nếu chạy UVDoc, chỉ truyền thẳng cái u2net_doc.
+            # Ta sẽ áp dụng Coons Patch Mesh Deformation thay vì Linear Perspective Transform nếu không dùng UVDoc!
             if result.get('u2net_doc') is not None:
                 img_for_dewarp = result['u2net_doc']
-                corners_for_dewarp = None # Tắt Perspective để bảo toàn viền dốc tự nhiên của sách
+                corners_for_dewarp = result['corners']
+                if args.uvdoc and result.get('u2net_mask') is not None:
+                    # UVDoc expects a tightly cropped document image (no large margins).
+                    # 'u2net_doc' has a white background but same size as orig. 
+                    # We crop to the bounding box of the u-2net mask
+                    x, y, w, h = cv2.boundingRect(result['u2net_mask'])
+                    img_for_dewarp = img_for_dewarp[y:y+h, x:x+w]
+                    print(f"[Step 2] Đã crop bằng Bounding Box của U2-Net cho UVDoc: {w}x{h}")
+                elif result.get('u2net_mask') is not None and corners_for_dewarp is not None and len(corners_for_dewarp) == 4:
+                    print(f"[Step 2] Áp dụng Coons Patch Mesh Deformation nắn phẳng viền cong...")
+                    from step2_coons_patch import CoonsPatchDewarper
+                    coons_dewarper = CoonsPatchDewarper()
+                    img_for_dewarp = coons_dewarper.dewarp_via_contour(img_for_dewarp, result['u2net_mask'], corners_for_dewarp)
+                    print(f"  ✓ Đã vuốt thẳng bằng Coons Patch: {img_for_dewarp.shape[1]}x{img_for_dewarp.shape[0]}")
+                    result['coons_warped'] = img_for_dewarp
+                    corners_for_dewarp = None # Tắt PerspectiveTransform cũ của page-dewarp
             else:
                 img_for_dewarp = orig
                 corners_for_dewarp = result['corners']
                 
-            warped = detector.transformer.dewarp(img_for_dewarp, corners_for_dewarp) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img_for_dewarp, corners_for_dewarp)
+            warped = detector.transformer.dewarp(img_for_dewarp) if args.uvdoc else (detector.transformer.dewarp(img_for_dewarp, corners_for_dewarp) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img_for_dewarp, corners_for_dewarp))
             result['warped'] = warped
             cv2.imwrite(f"{save_prefix}_step2_dewarped.jpg", warped)
             

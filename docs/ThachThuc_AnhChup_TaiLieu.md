@@ -21,8 +21,8 @@ Dưới đây là 20 vấn đề được chia thành 4 nhóm chính, cùng vớ
 | **Nhóm 2: Biến dạng Hình học & Không gian (Geometric & Spatial Distortions)** |
 | 8 | Lệch góc phối cảnh (Perspective Distortion) do tư thế cầm | ✅ Đã xử lý | **ML Segmentor (DocAligner/YOLOv8)** + **Perspective Transform** (Step 1, 2a) |
 | 9 | Rìa góc giấy gập gãy, quăn mép, gió thổi bay | ✅ Đã xử lý | **U²-Net (Rembg)** bóc tách nền linh động bảo toàn nếp lượn sóng (Luồng A) |
-| 10 | Biến dạng lượn cong phi tuyến tính do vùng gáy sách dày | ✅ Đã xử lý | **Text-line Dewarping** (`page-dewarp` ML) (Step 2b) |
-| 11 | Bề mặt nhấp nhô lồi lõm do vò nát nhầu nhĩ | ✅ Đã xử lý | **U²-Net** bóc nền + **Text-line Dewarping** ủi phẳng 3D Spline |
+| 10 | Biến dạng lượn cong phi tuyến tính do vùng gáy sách dày | ✅ Đã xử lý | **Text-line Dewarping** / **UVDoc Neural Grid** (Step 2b, 2c) |
+| 11 | Bề mặt nhấp nhô lồi lõm do vò nát nhầu nhĩ | ✅ Đã xử lý | **U²-Net** bóc nền + **UVDoc** nắn phẳng 3D / Spline |
 | 12 | Quang sai vật lý do thấu kính cụm cam góc rộng (Móp rìa) | ❌ Chưa xử lý | Chưa có **Camera Calibration** |
 | **Nhóm 3: Sai hỏng Tiêu cự & Rung máy (Camera Hardware Constraints)** |
 | 13 | Rung mờ chuyển động (Motion Blur) do thao tác tay bấm | ✅ Đã xử lý | **Unsharp Masking / Deblurring** (Step 3b) |
