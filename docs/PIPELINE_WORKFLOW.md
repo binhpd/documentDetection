@@ -12,9 +12,9 @@
 - **Làm gì:** Dùng mạng nơ-ron học sâu U²-Net đục thủng background 100%, bảo vệ nguyên vẹn ngay cả một tờ giấy bị nhàu nát lượn sóng, không bóp méo hay ép thành 4 góc cứng nhắc. Bức ảnh được cắt và đóng lên tấm nền trắng tinh mới.
 - **Output:** Tờ giấy cong lượn tự nhiên trên nền trắng.
 
-**Luồng B: Trích xuất góc ML Segmentation (DocAligner / YOLOv8 - Chế độ lai) 🔴 ML**
+**Luồng B: Trích xuất góc ML Segmentation (DocAligner) 🔴 ML**
 - 1a. *Tiền xử lý 🟢*: Thu nhỏ ảnh, mờ Gaussian để dễ phân tích bề mặt.
-- 1b. *Phân đoạn AI 🔴*: Thay vì dùng Hough Lines thủ công, hệ thống dùng **DocAligner** chuyên dụng để tìm góc. Nếu máy không cài DocAligner, mã nguồn lùi về **YOLOv8 Segmentation** để sinh mặt nạ giấy, từ đó sử dụng Bounding Box xoay (`minAreaRect`) để bao bọc và thu gom 4 tọa độ góc.
+- 1b. *Phân đoạn AI 🔴*: Thay vì dùng Hough Lines thủ công, hệ thống dùng **DocAligner** chuyên dụng để tìm góc. Mã nguồn sinh mặt nạ giấy, từ đó sử dụng Bounding Box xoay (`minAreaRect`) để bao bọc và thu gom 4 tọa độ góc.
 - **Output:** Mảng 4 tọa độ góc trên khung ảnh hiện tại, kèm theo Mask nhị phân.
 
 ---
@@ -22,7 +22,7 @@
 ## STEP 2: BIẾN ĐỔI HÌNH HỌC VÀ LÀM PHẲNG (Geometric & Dewarping)
 
 ### 2a. Perspective Transform (Biến đổi phối cảnh vuông góc) 🟢 Image Processing
-- **Khi nào chạy:** Khi bước 1 chạy bằng Luồng B (Trích xuất 4 góc của YOLO/DocAligner).
+- **Khi nào chạy:** Khi bước 1 chạy bằng Luồng B (Trích xuất 4 góc của DocAligner).
 - **Làm gì:** Tính ra ma trận 3x3 và dùng `warpPerspective` để kéo màn hình chéo lật nghiêng thành khung chữ nhật chuẩn hóa chính diện.
 - **Lưu ý:** Nếu hệ thống chạy bằng Luồng A (bóc mặt nạ U²-Net), bước biến đổi Phối cảnh này sẽ cố ý bị loại bỏ để bảo toàn dốc độ cong lượn vật lý nguyên bản cho quá trình ủi dòng ở 2b.
 - **Output:** Ảnh tài liệu duỗi màn hình ngang dọc nhìn đối xứng tuyến tính.
@@ -79,4 +79,4 @@
 
 ## Tổng kết cơ chế tích hợp ML
 
-Bằng việc lồng Mạng Nơ-ron (Rembg/U2Net/DocAligner/YOLO) vào **Bước 1**, và Trí tuệ AI vuốt nếp dòng chữ vào **Bước 2**, Pipeline xử lý ảnh truyền thống trước đây đã được lột xác trở thành 1 hệ thống **Front-line Machine Learning chuyên sâu**. Thay vì mò mẫm vẽ đường bờ bao bằng xử lý điểm ảnh OpenCV dễ trật nhịp, Machine Learning đánh chặn ngay vào não điểm ảnh, đẩy OpenCV (Bước 3) về vị trí Tăng Cường Sinh Học đầu cuối mang lại một hệ thống Scanner App chuẩn hóa quốc tế mạnh mẽ.
+Bằng việc lồng Mạng Nơ-ron (Rembg/U2Net/DocAligner) vào **Bước 1**, và Trí tuệ AI vuốt nếp dòng chữ vào **Bước 2**, Pipeline xử lý ảnh truyền thống trước đây đã được lột xác trở thành 1 hệ thống **Front-line Machine Learning chuyên sâu**. Thay vì mò mẫm vẽ đường bờ bao bằng xử lý điểm ảnh OpenCV dễ trật nhịp, Machine Learning đánh chặn ngay vào não điểm ảnh, đẩy OpenCV (Bước 3) về vị trí Tăng Cường Sinh Học đầu cuối mang lại một hệ thống Scanner App chuẩn hóa quốc tế mạnh mẽ.

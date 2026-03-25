@@ -54,7 +54,7 @@
 
 ### SLIDE 4: Các bài toán nghiên cứu liên quan đến Document Restoration
 *Nêu các hướng nghiên cứu hiện nay trên thế giới để giải quyết nhóm vấn đề trên:*
-- **Nghiên cứu về Trích xuất và Nắn chỉnh phối cảnh (Document Localization):** Từ các phương pháp cổ điển dò cạnh (Edge/Contour Detection như Hough, Canny) đến hiện đại hóa bằng Deep Learning (Segment ranh giới bằng U-Net, YOLO).
+- **Nghiên cứu về Trích xuất và Nắn chỉnh phối cảnh (Document Localization):** Từ các phương pháp cổ điển dò cạnh (Edge/Contour Detection như Hough, Canny) đến hiện đại hóa bằng Deep Learning (Segment ranh giới bằng U-Net, DocAligner).
 - **Nghiên cứu về Vuốt thẳng dòng chữ cong (Dewarping):** Dùng lưới tọa độ Spline nội suy 3D để uốn lại mặt phẳng cong (ví dụ thuật toán text-line dewarping).
 - **Nghiên cứu về Tăng cường (Enhancement):** Làm sạch rác tín hiệu, Binarization (nhị phân hóa) đưa ảnh màu sặc sỡ về bản trắng đen kỹ thuật số tinh giản.
 
@@ -75,7 +75,7 @@ Dựa trên các bài toán nan giải trên, dự án tập trung vào:
 
 ### SLIDE 7: Phương Pháp Tiếp Cận (The Core Pipeline)
 *Sơ đồ luồng 3 bước (Vẽ sơ đồ luồng):*
-- **STEP 1 [ML Detection]:** Bứt phá khỏi Canny truyền thống. Dùng AI (DocAligner/YOLO/U2Net) để ép khung và bóc hẳn cả cấu trúc tờ giấy lách qua phông nền tạp nham.
+- **STEP 1 [ML Detection]:** Bứt phá khỏi Canny truyền thống. Dùng AI (DocAligner/U2Net) để ép khung và bóc hẳn cả cấu trúc tờ giấy lách qua phông nền tạp nham.
 - **STEP 2 [Geometric Dewarping]:** Can thiệp tọa độ — Chiếu vuông góc (Perspective Transform) và Nắn đường lượn sóng (Text-line Dewarping).
 - **STEP 3 [CV Enhancement]:** Tăng cường chốt chặn 4 khâu hoàn chỉnh: Xóa đốm Lóa -> Kéo gắt viền chữ rung nhòe -> Triệt tiêu bóng loang -> **Phơi sáng Xám Tuyến Tính (Soft Binarize)**.
 
@@ -92,7 +92,7 @@ Dựa trên các bài toán nan giải trên, dự án tập trung vào:
 ### SLIDE 9: Thực nghiệm Step 1 & 2 (Cắt và Ép mặt phẳng)
 *Chèn ảnh so sánh (Before / After):*
 - Hình 1: Ảnh gốc trên bàn bừa bộn + chụp nghiêng chéo.
-- Hình 2: Kết quả bóc nền (Ảnh mask đỏ) bởi YOLO / DocAligner / Rembg.
+- Hình 2: Kết quả bóc nền (Ảnh mask đỏ) bởi DocAligner / Rembg.
 - Hình 3: Kết quả sau biến đổi ma trận — Tờ giấy đã được lật đứng chóp 1 cách ngay ngắn và vuốt nếp rãnh gáy sách.
 
 ### SLIDE 10: Thực nghiệm Step 3.1 & 3.2 (Khử Lóa & Khử Rung)

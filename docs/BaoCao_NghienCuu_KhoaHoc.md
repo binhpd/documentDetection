@@ -41,7 +41,7 @@ Hệ thống của nhóm đưa ra cấu trúc **Front-line Machine Learning**, c
 ### Bước 1: Trích xuất và Cô lập Vùng Tài Liệu (ML Detection)
 Nhóm từ bỏ các thuật toán nội suy cạnh dễ gãy vỡ (Canny, approxPolyDP) và cấu hình lại theo 2 luồng AI độc lập:
 - **Trích xuất nền trực tiếp (Luồng A):** Sử dụng mạng **U²-Net (Rembg)** với kiến trúc Nested U-Structure để tính toán bản đồ xác suất (Salient Map) của vật thể chính (tờ giấy). Mô hình này lách được cắt đúng đường lượn sóng tự nhiên của giấy bị nhàu nhĩ mà không ép vỡ định dạng màng [8].
-- **Ánh xạ Tọa độ Đỉnh (Luồng B - DocAligner/YOLOv8):** Sử dụng các mô hình Neural để phân đoạn và sinh ra "Bóng" (Mask) khu vực tài liệu, từ đó áp dụng thuật toán Hình chữ nhật xoay (Bounding Box) để tính toán 4 góc lý tưởng chứa văn bản, bất chấp góc giấy bị ngón tay che khuất hay rách rưới.
+- **Ánh xạ Tọa độ Đỉnh (Luồng B - DocAligner):** Sử dụng các mô hình Neural để phân đoạn và sinh ra "Bóng" (Mask) khu vực tài liệu, từ đó áp dụng thuật toán Hình chữ nhật xoay (Bounding Box) để tính toán 4 góc lý tưởng chứa văn bản, bất chấp góc giấy bị ngón tay che khuất hay rách rưới.
 
 ### Bước 2: Phục hồi Đẳng cấu (Geometric Dewarping) & Giám định IoU
 Đối mặt với biến dạng góc lượn lõm:
@@ -67,7 +67,7 @@ Sau khi ML đã lo cấu trúc dọn dẹp vật lý, Computer Vision can thiệ
 Hệ thống được thử nghiệm trên bộ Dataset đa dạng thu thập trực tiếp từ Camera di động, gồm **1.020 ảnh**, chia thành 7 danh mục siêu khó: *Curved, Fold (Nhăn), Incomplete (Tay che), Perspective (Cực nghiêng), Rotate, Normal, Random (Môi trường nền như thảm cỏ, giường len...)*.
 
 ### 4.2. So sánh Định lượng
-Nhóm đã triển khai đối sánh 1:1 giữa mô hình **Traditional CV (Canny + Contour)** và bộ khung **Hybrid ML (YOLO/DocAligner + Dewarping)**.
+Nhóm đã triển khai đối sánh 1:1 giữa mô hình **Traditional CV (Canny + Contour)** và bộ khung **Hybrid ML (DocAligner + Dewarping)**.
 
 | Phân Loại Thử Thách | Tỷ lệ thành công (IP Truyền Thống) | Tỷ lệ thành công (Hybrid Machine Learning) | Ghi chú / Nguyên nhân ML chiến thắng |
 | :--- | :---: | :---: | :--- |

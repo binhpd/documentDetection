@@ -38,7 +38,7 @@ Vì vậy, hệ thống đã trang bị Cơ chế chống Véo (Anti-Pinch):
 
 ## 2. MÔ HÌNH HÓA TOÁN HỌC: BƯỚC 2 (PERSPECTIVE WARP) HOẠT ĐỘNG NHƯ THẾ NÀO?
 
-Để giúp bạn đưa vào báo cáo làm dẫn chứng, dưới đây là mô hình cơ chế hoạt động của Bước 2 khi nó hoạt động bình thường (với sự hỗ trợ của dò 4 góc từ YOLO / DocAligner).
+Để giúp bạn đưa vào báo cáo làm dẫn chứng, dưới đây là mô hình cơ chế hoạt động của Bước 2 khi nó hoạt động bình thường (với sự hỗ trợ của dò 4 góc từ DocAligner hoặc Canny fallback).
 
 ### A. Phương trình chiếu (Projective Transformation Matrix)
 Mục tiêu là ánh xạ một tứ giác bất kỳ trên ảnh camera $P = \{P_1, P_2, P_3, P_4\}$ thành một hình chữ nhật phẳng $P' = \{P'_1, P'_2, P'_3, P'_4\}$ nhìn từ trên xuống (Bird's-eye view). 
@@ -57,7 +57,7 @@ $$ y' = \frac{m_{21}x + m_{22}y + m_{23}}{m_{31}x + m_{32}y + 1} $$
 
 ```mermaid
 graph TD
-    A[Ảnh gốc chụp chéo] -->|Step 1 YOLO/Canny| B(Sắp xếp 4 điểm: TL, TR, BR, BL)
+    A[Ảnh gốc chụp chéo] -->|Step 1 DocAligner| B(Sắp xếp 4 điểm: TL, TR, BR, BL)
     B --> C{Tính kích thước Max Height / Max Width}
     
     C -->|Width| W[W = max(TopEdge, BottomEdge)]

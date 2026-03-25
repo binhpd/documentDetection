@@ -29,9 +29,9 @@ Bước này dùng "Trí thông minh" để phát quang bụi rậm. Ta có 2 lu
 * **Xử lý:** Mạng U²-Net quét qua ảnh ở nhiều tầng cấu trúc, nén và bung các đặc trưng thị giác chéo để khoanh ra toàn bộ đám pixel thuộc về "Tờ giấy".
 * **Output:** Mặt nạ Rỗng (Alpha Channel). Giấy là mảng Trắng (255), Background là Đen (0).
 
-### Luồng B: Image Segmentation (YOLOv8 / DocAligner)
+### Luồng B: Image Segmentation (DocAligner)
 * **Ý nghĩa học thuật:** Dò tìm thực thể riêng biệt.
-* **Xử lý:** YOLOv8 phát hiện lớp đối tượng "Tài liệu" và tô đè một lớp mặt nạ (Mask) phân đoạn theo lề cạnh của nó.
+* **Xử lý:** DocAligner phát hiện lớp đối tượng "Tài liệu" và tô đè một lớp mặt nạ (Mask) phân đoạn theo lề cạnh của nó.
 
 ---
 
