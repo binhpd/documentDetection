@@ -63,7 +63,33 @@ class DocumentEnhancer:
             if i == 2: 
                 final_img = soft_bin
                 
-        return final_img
+        # --- TÍNH NĂNG MỚI: XỬ LÝ ẢNH MÀU NGUYÊN BẢN ---
+        print("[Step 3] 🎨 Tái tạo ảnh Màu sắc (Color Mode)... Tẩy trắng nền giữ nguyên màu sắc chữ, dấu mộc")
+        color_noshadow = self.remove_shadows_division_color(sharpened_img)
+        
+        # 5 Cặp tham số tương quan cho CHẾ ĐỘ ẢNH MÀU
+        color_threshold_pairs = [
+            (30, 240),  # Option 6: Giữ Trọn Vẹn Cả Màu Siêu Nhạt (Bút highlight nhạt, phấn màu, logo chìm)
+            (40, 230),  # Option 7: Cân Bằng Chuẩn Màu Sắc (Trắng tinh khôi, màu dịu mắt tự nhiên)
+            (50, 210),  # Option 8: Dấu Mộc Đậm Hơn, Nền Trắng Sáng
+            (60, 190),  # Option 9: Gắt - Chữ đen nhánh & Mộc Đỏ Chót, Nền Cháy Sáng
+            (70, 170)   # Option 10: Siêu Gắt - Ép mọi màu nhạt rực rỡ lên tối đa
+        ]
+        
+        best_color_enhanced = None
+        for i, (bp, wp) in enumerate(color_threshold_pairs, 6):
+            color_enhanced = self.enhance_color(color_noshadow, bp=float(bp), wp=float(wp))
+            
+            if save_prefix is not None:
+                filename = f"{save_prefix}_step3_4_opt{i}_Color_B{bp}_W{wp}.jpg"
+                cv2.imwrite(filename, color_enhanced)
+                print(f"  -> Lưu mẫu thử Ảnh Màu Opt {i} (Đen:{bp}, Trắng:{wp}) ra {filename}")
+                
+            if i == 7: # Option 7 (40-230) là mức tiêu chuẩn vàng, ta lấy làm đại diện nếu muốn return
+                best_color_enhanced = color_enhanced
+            
+        # Có thể return best_color_enhanced nếu muốn show bản màu lên cuối cùng, hoặc return final_img
+        return best_color_enhanced
 
     def deskew_and_crop(self, image):
         """
@@ -151,10 +177,8 @@ class DocumentEnhancer:
 
     def remove_shadows_division(self, image):
         """
-        Phương pháp "Division-based Illumination Normalization".
-        Dùng để khử cực sạch các bóng đen/ngón tay ám trên giấy.
+        Khử bóng râm đen trắng truyền thống.
         """
-        # Chuyển xám để lấy bản đồ ánh sáng (nếu chưa xám)
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
@@ -170,6 +194,74 @@ class DocumentEnhancer:
         normalized_gray = np.clip(normalized_float, 0, 255).astype(np.uint8)
         
         return normalized_gray
+
+    def remove_shadows_division_color(self, image):
+        """
+        Khử bóng râm nhưng giữ nguyên 3 KÊNH MÀU RGB, hoàn toàn khắc phục lỗi Viền Xám và Ám Tím (Colored Halos).
+        """
+        # Tách màu độc lập B, G, R
+        planes = cv2.split(image)
+        bg_planes = []
+        
+        # Kernel siêu nhỏ vì ta sẽ làm việc trên ảnh thu nhỏ (Hiệu năng cực cao)
+        kernel_size = 11 
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        
+        for plane in planes:
+            # 1. Downscale kích thước ảnh xuống 5 lần để tăng tốc nội suy & nới rộng góc nhìn nội suy Bóng Râm
+            small_plane = cv2.resize(plane, (0, 0), fx=0.2, fy=0.2)
+            
+            # 2. Nuốt chửng toàn bộ chi tiết tối mảnh (chữ, nét vẽ) bằng Dilate (Phình to phần giấy trắng)
+            bg_small = cv2.dilate(small_plane, kernel)
+            
+            # 3. Phá hủy răng cưa vuông vắn do hệ lụy của Dilation
+            bg_small = cv2.medianBlur(bg_small, 11)
+            bg_small = cv2.GaussianBlur(bg_small, (21, 21), 0)
+            
+            # 4. Phóng to trả lại nguyên bản và dội thêm 1 lần Gaussian lớn nhất để biến mảng Pixel thành dạng Lưới Điện Toả Sáng
+            bg_plane = cv2.resize(bg_small, (plane.shape[1], plane.shape[0]))
+            bg_plane = cv2.GaussianBlur(bg_plane, (31, 31), 0)
+            
+            bg_planes.append(bg_plane)
+        
+        # Ghép rập khuôn 3 lưới điện lại (Ánh sáng thực với đầy đủ nhiệt độ màu Ambient)
+        bg_3d = cv2.merge(bg_planes)
+        
+        # Phép chia "Shadow Division" theo thuyết Nguồn Sáng Kép (Illumination Theory)
+        # Nguồn sáng / Background -> Trắng (255) hoàn đối mọi dải màu dù bóng tím đen
+        normalized_float = 255.0 * (image.astype(float) / (bg_3d.astype(float) + 1e-6))
+        normalized_color = np.clip(normalized_float, 0, 255).astype(np.uint8)
+        
+        return normalized_color
+
+    def enhance_color(self, normalized_color, bp=40.0, wp=230.0):
+        """
+        Thổi bay bóng râm mờ còn sót lại và nâng mức bão hòa màu sắc.
+        """
+        # 1. Soft Binarization TRÊN CẢ 3 KÊNH MÀU
+        # (CẬP NHẬT NGƯỠNG RẤT NHẸ): Do đã khử bóng triệt để ở bước trên, nền giấy lúc này rất gần 255.
+        # Chúng ta chỉ nên ép nhẹ những phổ xám > wp thành Trắng tinh, và kéo màu nhạt xuống xíu (bp).
+        # Tuyệt đối không để wp quá thấp (185) trừ phi cố tình muốn gắt màu.
+        
+        stretched = (normalized_color.astype(np.float32) - bp) * (255.0 / (wp - bp))
+        stretched_color = np.clip(stretched, 0, 255).astype(np.uint8)
+        
+        # 2. Chuyển sang không gian màu HSV để kích bão hòa (Đâm chồi màu sắc)
+        hsv = cv2.cvtColor(stretched_color, cv2.COLOR_BGR2HSV).astype(np.float32)
+        h, s, v = cv2.split(hsv)
+        
+        # Tăng Saturation (độ rực rỡ) lên 30% để mực nét hơn, con dấu đỏ chót hơn
+        s = s * 1.3
+        s = np.clip(s, 0, 255)
+        
+        hsv_enhanced = cv2.merge([h, s, v]).astype(np.uint8)
+        enhanced_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
+        
+        # 3. Áp dụng bộ lọc Unsharp Masking 1 lần nữa ở layer cuối cùng để sắc bén
+        gaussian = cv2.GaussianBlur(enhanced_bgr, (0, 0), 2.0)
+        final_sharp = cv2.addWeighted(enhanced_bgr, 1.2, gaussian, -0.2, 0)
+        
+        return final_sharp
 
     def smart_binarize(self, gray_image, black_point=110.0, white_point=200.0):
         """

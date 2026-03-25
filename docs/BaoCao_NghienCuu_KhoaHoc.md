@@ -41,16 +41,17 @@ Hệ thống của nhóm đưa ra cấu trúc **Front-line Machine Learning**, c
 ### Bước 1: Trích xuất và Cô lập Vùng Tài Liệu (ML Detection)
 Nhóm từ bỏ các thuật toán nội suy cạnh dễ gãy vỡ (Canny, approxPolyDP) và cấu hình lại theo 2 luồng AI độc lập:
 - **Trích xuất nền trực tiếp (Luồng A):** Sử dụng mạng **U²-Net (Rembg)** với kiến trúc Nested U-Structure để tính toán bản đồ xác suất (Salient Map) của vật thể chính (tờ giấy). Mô hình này lách được cắt đúng đường lượn sóng tự nhiên của giấy bị nhàu nhĩ mà không ép vỡ định dạng màng [8].
-- **Ánh xạ Tọa độ Đỉnh (Luồng B - DocAligner/YOLOv8):** Dùng mạng Neural dự đoán trực tiếp tọa độ Heatmap của 4 góc lý tưởng của khu vực văn bản, bất chấp góc giấy bị ngón tay che khuất hay rách rưới.
+- **Ánh xạ Tọa độ Đỉnh (Luồng B - DocAligner/YOLOv8):** Sử dụng các mô hình Neural để phân đoạn và sinh ra "Bóng" (Mask) khu vực tài liệu, từ đó áp dụng thuật toán Hình chữ nhật xoay (Bounding Box) để tính toán 4 góc lý tưởng chứa văn bản, bất chấp góc giấy bị ngón tay che khuất hay rách rưới.
 
-### Bước 2: Phục hồi Đẳng cấu (Geometric Dewarping)
+### Bước 2: Phục hồi Đẳng cấu (Geometric Dewarping) & Giám định IoU
 Đối mặt với biến dạng góc lượn lõm:
 - **Perspective Transform:** Ma trận chiếu hình $3\times3$ chuẩn hóa kéo mặt nghiêng về 1 mặt trực diện (`cv2.warpPerspective`).
-- **Text-line Dewarping (AI):** Dựa trên luồng tư duy của **DocUNet** [9], hệ thống phân tích đường cong các hàng chữ bị võng do mép gáy sách, sinh ra lưới Warp dạng Spline Grid 3D để uốn đảo chiều các Pixel dềnh sóng, tạo ra mặt phẳng 2D không bị lồi.
+- **Text-line Dewarping / UVDoc (AI):** Dựa trên luồng tư duy của **DocUNet** [9], hệ thống sử dụng mạng Neural (như UVDoc) phân tích bề mặt tài liệu, sinh ra lưới Warp dạng Spline Grid 3D để uốn đảo chiều các Pixel dềnh sóng. 
+- **Chốt chặn Toán Học (Geometric IoU Anti-Pinch):** Để ngăn chặn rủi ro AI làm méo (pinch) các tài liệu vốn đã phẳng, thuật toán áp dụng đối chuẩn **Intersection over Union (IoU)**. Nếu viền cắt của mạng U²-Net khớp >94% với đa giác 4 đỉnh lý tưởng, AI Dewarping sẽ bị chặn đứng để bảo tồn nội suy quang học nguyên thủy (Perspective Transform).
 
 ### Bước 3: Tăng cường và Làm mềm Tiêu chuẩn Kép (Endpoint CV Enhancement)
 Sau khi ML đã lo cấu trúc dọn dẹp vật lý, Computer Vision can thiệp nhằm tinh chỉnh hóa quang học mức Cell-pixel:
-1. **Khử rọi bóng (Division-based Illumination Normalization):** Theo nghiên cứu của Gonzalez & Woods [10] về chiếu sáng không gian tĩnh, nhóm áp dụng toán tử hình thái học `MORPH_CLOSE` (kernel 21x21) để bào mòn nền chữ, tạo thành một Background Map ảo chứa dải Gradient bóng phân tán. Thuật toán đem ma trận ảnh chia lại cho Background Map này, giúp trung hòa triệt để các tảng bóng tay, bóng điện thoại [1].
+1. **Khử rọi bóng Kênh Độc Lập (RGB-Independent Illumination Normalization):** Theo nghiên cứu của Gonzalez & Woods [10] về chiếu sáng không gian tĩnh, nhóm áp dụng toán tử hình thái học `MORPH_CLOSE` (kernel 21x21) để bào mòn nền chữ. Đột phá nằm ở chỗ: thay vì xử lý ảnh xám, thuật toán tách lọc độc lập 3 kênh Đỏ, Lục, Lam (RGB) để tạo ra 3 Background Maps ảo chứa dải Gradient bóng phân tán theo đúng Nhiệt độ màu thực tế. Thuật toán đem ma trận ảnh chia lại cho các Background Maps này, giúp trung hòa triệt để các tảng bóng tay, bóng điện thoại [1] mà không làm ám mờ (Color halos) mực xanh chữ ký.
 2. **Khôi phục đốm Flash (Inpainting):** Áp dụng thuật toán nội suy Telea [11] (`cv2.inpaint`) điền đắp màu vá các lỗ rỗ do đèn Flash.
 3. **Phơi sáng Mềm (Piecewise Linear Stretching / Soft Binarization):** 
    - Không áp dụng ngưỡng cắt đứt đoạn như Otsu. Phương pháp dùng kỹ thuật dãn biểu đồ tương phản tuyến tính mảnh (Piecewise Linear). 

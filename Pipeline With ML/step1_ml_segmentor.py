@@ -81,13 +81,14 @@ class YOLOSegmentor:
                 return False
         return True
 
-    def segment(self, image):
+    def segment(self, image, padding=0):
         """Phân vùng tài liệu bằng YOLO.
 
         Chiến lược:
             1. Chạy YOLO inference → danh sách masks + classes
             2. Ưu tiên mask thuộc class 'book'
             3. Nếu không có → lấy mask có diện tích lớn nhất
+            - Tuân thủ Negative Padding = padding để teo mask, cắt vô ruột.
 
         Returns:
             mask: Ảnh nhị phân (H × W), 255 = giấy, 0 = nền
@@ -196,6 +197,7 @@ class SimpleUNet:
         self.model_path = model_path
         self.model = None
         self.device = None
+        self.model_load_failed = False # Flag to prevent repeated load attempts
 
     def build_model(self):
         """Xây dựng kiến trúc U-Net bằng PyTorch."""
@@ -272,15 +274,22 @@ class SimpleUNet:
 
     def load_model(self):
         """Load model đã huấn luyện."""
+        if self.model_load_failed:
+            return False
+        if self.model is not None:
+            return True # Already loaded
+
         try:
             import torch
         except ImportError:
             print("[ML] Chưa cài PyTorch.")
+            self.model_load_failed = True
             return False
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.build_model()
         if self.model is None:
+            self.model_load_failed = True
             return False
 
         if self.model_path:
@@ -290,12 +299,16 @@ class SimpleUNet:
                 print(f"[ML] Đã load U-Net model: {self.model_path}")
             except Exception as e:
                 print(f"[ML] Lỗi load model: {e}")
+                self.model_load_failed = True
                 return False
+        else:
+            print("[ML] Không có model_path cho U-Net. Sẽ không thực hiện inference.")
+            self.model_load_failed = True
+            return False
 
         self.model.to(self.device)
         self.model.eval()
         return True
-
     def predict(self, image, input_size=256):
         """Dự đoán mask tài liệu.
         
@@ -326,7 +339,7 @@ class SimpleUNet:
         mask = (prob_map > 0.5).astype(np.uint8) * 255  # Threshold tại 0.5
         mask = cv2.resize(mask, (orig_w, orig_h))  # Resize về kích thước gốc
 
-        # Trích 4 góc từ mask
+        # Trích 4 góc từ mask bằng thuật toán nâng cao
         corners = self._mask_to_corners(mask)
         return mask, corners
 

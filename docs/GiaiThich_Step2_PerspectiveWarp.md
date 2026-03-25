@@ -17,7 +17,22 @@ Khi `corners = None` được truyền vào `PerspectiveTransformer`, hàm sẽ 
 **Đây không phải là lỗi rác (Bug), mà là Thiết kế An toàn (Fail-safe Design) với lý do sau:**
 - **Bản chất của U²-Net:** U²-Net không trả về 4 tọa độ góc vuông. Nó trả về một "cái bóng" (Mask) cắt ôm sát đường biên cong lượn của tờ giấy nhàu nát/gập gáy. 
 - **Sự xung đột Toán học:** Perspective Warp (Bước 2) **bắt buộc** phải nhận vào 4 điểm thẳng tắp để chiếu lên 1 hình chữ nhật. Nếu chúng ta cố ép cái mask lượn sóng của U²-Net thành 4 điểm và dùng Perspective Warp, kết quả tài liệu sẽ bị **kéo giãn bẹp dúm bóp méo** (giống như bạn cầm 4 góc của cái áo nhăn nhúm và kéo dãn nó ra một cách thô bạo).
-- **Giải pháp:** Đối với đầu ra của U²-Net, ta phải bypass đoạn Linear Perspective (2a) và đẩy nó thẳng vào mạng AI nặn vật lý 3D **Text-line Dewarping (2b)** để ủi phẳng mượt mà.
+- **Giải pháp CŨ:** Đối với đầu ra của U²-Net, ta phải bypass đoạn Linear Perspective (2a) và đẩy nó thẳng vào mạng AI nặn vật lý 3D **Text-line Dewarping (2b)** hoặc **UVDoc (2c)** để ủi phẳng mượt mà.
+
+---
+
+## 1.5 CẬP NHẬT MỚI NHẤT (SMART BYPASS & ANTI-PINCH)
+
+Trong các file cập nhật gần nhất, thuật toán đã thông minh hơn rất nhiều. Việc loại bỏ Step 2 chỉ còn xảy ra nếu **thực sự quyển sách bị cong**.
+
+Nếu U²-Net cắt ra một thẻ Căn Cước hoặc 1 phong bì phẳng góc nghiêng, góc uốn (Curve) bằng 0. Nếu khi ấy ta lôi UVDoc ra dùng, lưới nơ-ron của nó sẽ bị **Ảo giác Cánh Cung (Pinch Effect)** và thắt eo mảnh giấy lại!
+
+Vì vậy, hệ thống đã trang bị Cơ chế chống Véo (Anti-Pinch):
+- **Toán Học Không Gian (Intersection over Union - IoU):**
+  - Hệ thống nhặt 4 góc ảo của u2net và kéo căng 4 đường thẳng tạo thành 1 khung Đa Giác lý tưởng (Ideal Polygon).
+  - So sánh Diện Tích của Đa Giác này so với Mask cực nhỏ do U2Net tỉa.
+  - Nếu `IoU > 94%`: Tài liệu lấp đầy 94% khung đa giác -> Thẳng cạnh! -> **HỦY BỎ NEURAL UVDOC**, kích hoạt lại Phương Trình Perspective Chiếu Hình Học (Step 2a) để tạo mảnh cắt sắc nét.
+  - Nếu `IoU < 94%`: Tài liệu hụt viền (Cong võng xuống) -> Bỏ Step 2a, tiếp tục cho UVDoc bẻ cong tọa độ 3D.
 
 ---
 

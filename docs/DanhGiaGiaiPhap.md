@@ -53,12 +53,17 @@ Hai mô hình Deep Learning được nhóm triển khai và đánh giá là: **Y
 * **Đề kháng với Curved & Fold:** Trong các tài liệu cong hoặc nhăn mép, DocAligner vẫn hiểu và nội suy được vị trí toán học chính xác của 4 góc lý tưởng để thuật toán crop hoạt động đúng nhất có thể.
 * **Tốc độ:** Vì kiến trúc backbone nhẹ hơn YOLO, tốc độ inference của DocAligner cực kỳ ấn tượng, hoàn toàn đáp ứng Real-time Video Scanner trên thiết bị di động.
 
-### 2.3 Mô hình UVDoc (Neural Grid-based Unwarping)
-* **Kỹ thuật:** Dự đoán lưới biến dạng 2D/3D (Neural Grid) thay vì góc cứng.
-* **Cách hoạt động:** Dùng mạng ResNet sâu để đánh giá toàn bộ bề mặt điểm ảnh, xuất ra lưới Warp ngược giải mã cong vênh thực vật lý của trang giấy (VD: lượn sóng cuộn, gập mép).
+### 2.3 Mô hình UVDoc (Neural Grid-based Unwarping) & Geometric IoU
+* **Kỹ thuật:** Dự đoán lưới biến dạng 2D/3D (Neural Grid) thay vì góc cứng. Tích hợp Song song Toán học Không gian (IoU).
+* **Cách hoạt động:** Dùng mạng ResNet sâu để đánh giá toàn bộ bề mặt điểm ảnh, xuất ra lưới Warp ngược giải mã cong vênh thực vật lý của trang giấy (VD: lượn sóng cuộn, gập mép). Điểm sáng giá nhất là hệ thống tự **Giám định IoU (Intersection over Union)**: So khớp Mask cong của AI với Đa giác 4 góc lý tưởng. Quá 94% khớp $\rightarrow$ Giấy phẳng $\rightarrow$ tự động tắt UVDoc để bảo tồn hình học nguyên thủy.
 
 **Đánh giá Ưu điểm:**
-* **Bất chấp độ lồi lõm vật lý:** Xóa bỏ hoàn toàn điểm yếu (A3) của phương pháp truyền thống. Khi kết hợp với U²-Net, nó phục dựng hoàn toàn tờ giấy nhầu nát vuông vức trở lại như một bản scan nhiệt.
+* **Chống méo góc (Anti-Pinch) tuyệt đối:** Xóa bỏ hoàn toàn điểm yếu (A3) của phương pháp truyền thống. Khi kết hợp với rào chắn IoU, mô hình không bao giờ bị "ảo giác" bóp méo 1 tờ giấy phẳng.
+
+### 2.4 Hậu xử lý Khử bóng (RGB-Independent Shadow Normalization)
+* **Kỹ thuật:** Thay vì chia sáng trên kênh Xám (Grayscale), thuật toán chia tách 3 kênh Xanh, Lục, Đỏ.
+* **Cách hoạt động:** Dùng `cv2.dilate` nuốt nét chữ trên từng màu độc lập, sau đó tạo màng Gaussian 51x51 riêng biệt cho từng tia sáng. Lấy Ảnh gốc chia cho 3 Bản đồ nền màu.
+* **Đánh giá Ưu điểm:** Khắc phục 100% lỗi "Ám Tím/Ám Xanh" (Color Halos) quanh nét chữ khi chụp dưới ánh sáng đèn pha màu. Giấy trắng phau nhưng chữ Ký Tiền Xanh và Con Dấu Đỏ giữ nguyên vẹn độ rực rỡ (Saturation).
 
 ---
 

@@ -14,7 +14,7 @@
 
 **Luồng B: Trích xuất góc ML Segmentation (DocAligner / YOLOv8 - Chế độ lai) 🔴 ML**
 - 1a. *Tiền xử lý 🟢*: Thu nhỏ ảnh, mờ Gaussian để dễ phân tích bề mặt.
-- 1b. *Phân đoạn AI 🔴*: Thay vì dùng Hough Lines thủ công, hệ thống dùng **DocAligner** chuyên dụng để nội suy 4 viền cực khít. Nếu máy không cài DocAligner, mã nguồn lùi về **YOLOv8 Segmentation** bao quanh vùng mặt nạ giấy, từ đó nội suy lấn vẽ đa giác thu gom 4 tọa độ góc.
+- 1b. *Phân đoạn AI 🔴*: Thay vì dùng Hough Lines thủ công, hệ thống dùng **DocAligner** chuyên dụng để tìm góc. Nếu máy không cài DocAligner, mã nguồn lùi về **YOLOv8 Segmentation** để sinh mặt nạ giấy, từ đó sử dụng Bounding Box xoay (`minAreaRect`) để bao bọc và thu gom 4 tọa độ góc.
 - **Output:** Mảng 4 tọa độ góc trên khung ảnh hiện tại, kèm theo Mask nhị phân.
 
 ---
@@ -34,8 +34,13 @@
 
 ### 2c. Neural Grid-based Document Unwarping (UVDoc) 🔴 Machine Learning
 - **Khi nào chạy:** Khi người dùng truyền cờ `--uvdoc` (thường kết hợp với `--u2net`).
-- **Làm gì:** Trái với Text-line Dewarping chỉ dựa vào chữ, **UVDoc** sử dụng Mạng Nơ-ron Đa lớp (ResNet) phân tích tài liệu để dự đoán ra một lưới tọa độ điểm 2D/3D (Neural Grid) biểu diễn độ nhăn nheo, cong vênh sọc dưa sâu sắc trên toàn bộ diện tích giấy. Từ lưới này áp dụng Bilinear Unwarping nội suy nắn phẳng cấu trúc vật lý tờ giấy.
-- **Output:** Khôi phục nguyên vẹn tỷ lệ tài liệu phẳng phiu hoàn hảo mà không hề cắt lẹm vào viền lề giấy như phương pháp đếm chữ của `page-dewarp`. Tốc độ có thể chậm hơn nhưng độ vẹn toàn cao nhất.
+- **Làm gì:** **UVDoc** sử dụng Mạng Nơ-ron Đa lớp (ResNet) phân tích tài liệu để dự đoán ra một lưới tọa độ điểm 2D/3D (Neural Grid) biểu diễn độ nhăn nheo, cong vênh sọc dưa sâu sắc trên toàn bộ diện tích giấy.
+- **⚡ MỚI: Tính năng Giám sát phẳng IoU (Anti-Pinch):** Vì UVDoc sẽ làm bóp méo 4 góc vuông của 1 tờ giấy phẳng (Pinch Effect), hệ thống tự động sinh ra một chốt chặn Toán Học:
+  - Khởi tạo 1 Đa giác 4 góc đường thẳng (Ideal Polygon) bao trùm tài liệu.
+  - Tính Toán Diện Tích Tương Giao (Intersection over Union - IoU) giữa viền thực tế của U2-Net và Đa giác lý tưởng này.
+  - Nếu `IoU > 94%`: Tờ giấy được kết luận là "Hình Phẳng Hoàn Toàn". Thuật toán tự động tước quyền chạy UVDoc và ném về **2a (Perspective Warp)** để 4 góc được vuốt thẳng tắp như dao lam.
+  - Nếu `IoU < 94%`: Tờ giấy dấn mép, lõm gáy sách. Thuật toán giữ quyền cho phép UVDoc bóc tách lưới 3D Neural.
+- **Output:** Khôi phục độ nén cong của vật thể vật lý mà không làm rách viền. Độ vẹn toàn cực cao.
 
 ---
 
@@ -49,9 +54,13 @@
 - **Làm gì:** Sửa lỗi Motion Blur do người dùng chụp bị rung tay vòng lấy nét (AF) lỏng. Trừ ảnh hiện tại cho bản nhòe Gaussian (`addWeighted` kéo biên độ) nhằm khuếch đại nếp gấp viền.
 - **Output:** Kéo viền mép chữ trở nên sắc như dao cạo, khôi phục độ rõ cho sợi mực.
 
-### 3c. Khử bóng loang lổ (Division-based Shadow Normalization) 🟢 Image Processing
-- **Làm gì:** Áp dụng mảng Division-based Illumination. Dùng `MORPH_CLOSE` kernel lớn (21x21) ăn mòn mất gốc chữ đen, chỉ giữ lại độ râm tạo thành "Bản đồ phông nền" khuếch tán. Đem từng Pixel thực tế chia cho Bản đồ nền này (x255) khiến các mảng bóng tối tự dội ngược tỷ lệ sáng lên đồng đều với toàn trang.
-- **Output:** Bức ảnh xám với ánh sáng tờ giấy dàn phân bổ hoàn hảo không gợn bóng tay.
+### 3c. Khử bóng tự nhiên duy trì Màu thực (RGB Independent Shadow Normalization) 🟢 Image Processing
+- **Làm gì:** Trong khi các phương pháp Scanner khác ước lượng nền bằng màu xám, dẫn đến việc Bóng màu (bóng đổ của ánh sáng vàng/xanh môi trường) bị chia sai tỷ lệ gây ra Vết Ám Tím/Xám đậm xung quanh nét chữ. Hệ thống áp dụng một Cơ chế hoàn thiện cực cao:
+  - **Tách 3 Kênh BGR Độc lập:** Mỗi kênh (Xanh, Lục, Đỏ) được lấy mẫu phông nền một cách tách biệt.
+  - **Ghost Scale + Dilate:** Thu nhỏ ảnh cực nhanh, dùng `cv2.dilate` (Phình to) nuốt chửng toàn bộ chi tiết thẫm (mực).
+  - **MedianBlur + GaussianBlur (Radius 51x51):** Biến mảng Pixel phông nền thành màng Lưới Điện Toán Ánh Sáng mượt mà. Phóng to trả lại nguyên hiện trạng.
+  - Lấy từng pixel tài liệu gốc chia thẳng cho Bản đồ Phông Nền tương ứng của riêng kênh đó (`Thuyết Nguồn Sáng Kép`).
+- **Output:** Cân bằng lại cả Độ Sáng lẫn **Nhiệt Độ Màu** của vùng khuất bóng. Kết quả là một bức ảnh trắng phau nhưng duy trì nguyên vẹn màu Mực Xanh, Dấu Mộc Đỏ không dính một tì vết ám xám tàng hình nào.
 
 ### 3d. Phơi sáng mềm (Soft Binarization / Linear Contrast Stretching) 🟢 Image Processing
 - **Làm gì:** Việc dùng binarize gắt (Otsu hay Adaptive) thường chém đứt pixel xám ở viền, dãn đến nét mảnh bị vỡ rỗ, gai (jagged edges) và lấp mất độ nét thanh nét đậm. Pipeline chuyển sang áp dụng **Kéo giãn tương phản tuyến tính** định vị ngưỡng 1 phần (Piecewise Linear) thông qua 2 chốt Black Point (Ngưỡng đen) & White Point (Ngưỡng trắng):
