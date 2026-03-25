@@ -18,6 +18,12 @@ class DocumentEnhancer:
         2. Khử bóng & Thấm mực mặt sau (Illumination Normalization)
         3. Tăng cường chi tiết, nối nét chữ đứt gãy (Morphology)
         """
+        # (Đã tắt theo yêu cầu: Bỏ tính năng nắn xô lệch dòng chữ)
+        # print("[Step 3] 📐 Đang kiểm tra và nắn thẳng dòng chữ (Deskew & Crop)...")
+        # image = self.deskew_and_crop(image)
+        # if save_prefix is not None:
+        #     cv2.imwrite(f"{save_prefix}_step3_0_deskewed.jpg", image)
+
         print("[Step 3] 💡 Đang chẩn đoán Flash chói lóa (Glare)...")
         deglared_img = self.remove_glare(image)
         if save_prefix is not None:
@@ -58,6 +64,62 @@ class DocumentEnhancer:
                 final_img = soft_bin
                 
         return final_img
+
+    def deskew_and_crop(self, image):
+        """
+        Nắn thẳng lề chữ chạy lộn xộn (Deskew) và Cắt chém viền dư bừa bãi (Auto Crop)
+        """
+        # --- 1. Deskew ---
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Chữ đen nền trắng -> Chữ trắng nền đen
+        _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+        
+        coords = np.column_stack(np.where(thresh > 0))
+        if len(coords) > 0:
+            angle = cv2.minAreaRect(coords)[-1]
+            if angle < -45:
+                angle = -(90 + angle)
+            else:
+                angle = -angle
+                
+            # Chỉ xoay nếu góc lệnh đủ lớn nhưng không phải xoay chọc trời
+            if 0.2 < abs(angle) < 15:
+                print(f"  -> Thực hiện Deskew xoay {angle:.2f} độ để thẳng dòng cột.")
+                (h, w) = image.shape[:2]
+                center = (w // 2, h // 2)
+                M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                
+                cos = np.abs(M[0, 0])
+                sin = np.abs(M[0, 1])
+                nW = int((h * sin) + (w * cos))
+                nH = int((h * cos) + (w * sin))
+                
+                M[0, 2] += (nW / 2) - center[0]
+                M[1, 2] += (nH / 2) - center[1]
+                
+                image = cv2.warpAffine(image, M, (nW, nH), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=(255,255,255))
+
+        # --- 2. Auto Crop ---
+        gray2 = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Lọc ra tất cả pixel không phải màu trắng tinh 255
+        _, mask2 = cv2.threshold(gray2, 254, 255, cv2.THRESH_BINARY_INV)
+        
+        coords2 = np.column_stack(np.where(mask2 > 0))
+        if len(coords2) > 0:
+            y_min, x_min = np.min(coords2, axis=0)
+            y_max, x_max = np.max(coords2, axis=0)
+            
+            # Đệm lề nhẹ cho đẹp
+            pad = 15
+            y_min = max(0, y_min - pad)
+            x_min = max(0, x_min - pad)
+            y_max = min(image.shape[0], y_max + pad)
+            x_max = min(image.shape[1], x_max + pad)
+            
+            image = image[y_min:y_max, x_min:x_max]
+            print(f"  -> Cắt viền thừa tự động (Auto Cropped). Kích thước mới: {image.shape[1]}x{image.shape[0]}")
+            
+        return image
 
     def remove_glare(self, image):
         """
