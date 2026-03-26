@@ -77,13 +77,13 @@ Dựa trên các bài toán nan giải trên, dự án tập trung vào:
 *Sơ đồ luồng 3 bước (Vẽ sơ đồ luồng):*
 - **STEP 1 [ML Detection]:** Bứt phá khỏi Canny truyền thống. Dùng AI (DocAligner/U2Net) để ép khung và bóc hẳn cả cấu trúc tờ giấy lách qua phông nền tạp nham.
 - **STEP 2 [Geometric Dewarping]:** Can thiệp tọa độ — Chiếu vuông góc (Perspective Transform) và Nắn đường lượn sóng (Text-line Dewarping).
-- **STEP 3 [CV Enhancement]:** Tăng cường chốt chặn 4 khâu hoàn chỉnh: Xóa đốm Lóa -> Kéo gắt viền chữ rung nhòe -> Triệt tiêu bóng loang -> **Phơi sáng Xám Tuyến Tính (Soft Binarize)**.
+- **STEP 3 [CV Enhancement]:** Tăng cường chốt chặn 4 khâu hoàn chỉnh: Xóa đốm Lóa -> Kéo gắt viền chữ rung nhòe -> Triệt tiêu bóng loang -> **Phơi Sáng Tự Thích Ứng (Adaptive CLAHE/Percentile)**.
 
-### SLIDE 8: Điểm sáng Công nghệ: Soft Binarization (Linear Contrast Stretch)
-*Giải thích rõ tại sao không dùng Otsu/Adaptive.*
-- Thay vì chém đứt pixel theo chuẩn vỡ hạt 0-255 của Binarize đời cũ làm gai mảnh vỡ chữ, chúng ta áp dụng Piecewise Linear Stretching.
-- Khóa chặt Điểm Trắng (White Point) để đẩy bóng mù và lấm tấm rác lên Trắng xóa 255. Khóa chặt Điểm Đen (Black Point) lôi mực phai chìm xuống lõi 0.
-- Giữ khu vực trung gian đóng vai trò Anti-Aliasing, bảo vệ được sự quyện xám ở viền biên chữ, giúp chữ **mềm mại tuyệt đối** khi xuất PDF.
+### SLIDE 8: Điểm sáng Công nghệ: Tự Thích Ứng (Adaptive Histogram \u0026 CLAHE)
+*Giải thích rõ nhược điểm của công nghệ phơi sáng Cố Định (Fixed Threshold) và vỡ rỗ của Otsu.*
+- Khác biệt với cắt ngưỡng truyền thống (viền chữ đen nhẻm, gãy nét), hệ thống đo lường mảng phổ màu trên toàn cục bức ảnh để **Tự Phân Xác**.
+- Sử dụng **CLAHE (Cân bằng Lưới Cục Bộ)** lôi bật các góc tối/bóng râm để chữ đen trồi lên. Trích Bách Phân Vị (Percentile) kéo rác và lóa sáng chạm trần Trắng $255$.
+- Khu vực trung gian (Gradient biên chữ) hoạt động như Anti-Aliasing bảo toàn sự dẻo dai. Cộng hưởng với **LAB Denoising**, ảnh màu hoàn toàn sạch bụi rác quang học ảo.
 
 ---
 
@@ -104,9 +104,9 @@ Dựa trên các bài toán nan giải trên, dự án tập trung vào:
 *Chèn ảnh trước/sau khi qua hàm Division-based Shadow Removal:*
 - Mặt giấy bóng đen bàn tay thui thủi được cân bằng (Illumination Normalization). Phông nền trở về xám bạc sáng đồng đều.
 
-### SLIDE 12: Đỉnh cao Binarization (So sánh Options)
-*Trình chiếu cắt lát 2 hoặc 3 options khác nhau của thuật toán Phơi sáng mềm Soft Binarize:*
-- Nhấn mạnh hình thái chữ cắt Binarize thông thường (gai góc, lỗ rỗ) bên cạnh con chữ của Option hiện tại (nền đanh trắng phau, nhân đen thủng, nhưng vành cong con chữ có độ sương muối khử răng cưa mượt mắt).
+### SLIDE 12: Đỉnh cao Tự Thích Ứng (Adaptive Binarization)
+*Trình diễn khác biệt công nghệ cốt lõi của Step 3 bản Mới nhất:*
+- Nhấn mạnh hình thái nét chữ bị cháy lẹm/mất nét do phơi sáng cố định, so sánh với sự phục hồi hoàn hảo mảng mực của thuật toán mới (Nền trắng phau, nhân đen thủng, tấy triệt để bụi liti nhờ hệ LAB). Khả năng "Scan" Hợp Đồng Mộc Đỏ 100% rực rỡ.
 
 ---
 

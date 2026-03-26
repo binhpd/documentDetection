@@ -42,13 +42,18 @@ Thuật toán chia ánh sáng đỉnh cao nhát phá vỡ 100% bóng đổ đen 
 
 ---
 
-## 4. Phơi Sáng Mềm và Cắt Cặn Tương Phản (Soft Binarization)
-Nhị phân hóa (Binarize) là để in ra giấy (Mực Đen, Không Bấm Xám). Nhưng thuật toán Otsu chẻ viền rất đau rỗ chữ. Vấn đề là viền chữ luôn có 1 lớp sọc xám Anti-Aliasing bao quanh. Gọt đứt khối xám đó, nét mảnh sẽ gãy nát. 
+## 4. Phơi Sáng Thích Ứng \u0026 Cắt Cặn Tương Phản (Adaptive Soft Binarization \u0026 Denoising)
+Nhị phân hóa (Binarize) để in ra giấy (Mực Đen, Không Nenn Xám) bằng Otsu thường gây mẻ rỗ chữ. Thuật toán cố định (Fixed Thresholds) lại thường xuyên lỗi nếu ảnh sáng tối không đều. Chúng tôi sử dụng **Tự Thích Ứng (Adaptive)** để giải quyết trọn vẹn.
 
-* **Toán học cốt lõi:** Piecewise Linear Contrast Stretching (Dãn tương phản tuyến tính một phần nhánh).
-* **Cơ chế Ngưỡng Kép:**
-  - Gọi hai chốt khóa `Black Point = 110` và `White Point = 200`.
-  - Các Pixel màu đen nhánh từ $0 \rightarrow 110$: Ép kẹp thẳng về sụp bẫy nắp hầm Đen Nhánh cường độ = $0$. Lõi mực đen sầm vĩnh cửu.
-  - Các Pixel xám nhạt từ $200 \rightarrow 255$: Vẩy bay kịch trần Lóa Sáng cường độ = $255$. Rác bụi xám giấy biến mất.
-  - Dải Pixel hẹp giao thoa viền chữ: $110 \rightarrow 200$: Mở rộng dải độ dốc mờ, nhân tính tỷ lệ nội suy theo dải mượt Gradient. 
-* **Output:** Rìa chữ uốn cong ôm xám bảo toàn dẻo dai. Nền ngoài trắng phau, lõi trong đen tuyền ngòi bút chì gắt. Tự hào quét tài liệu đẳng cấp Enterprise.
+* **Toán học cốt lõi:** Contrast Limited Adaptive Histogram Equalization (CLAHE) \u0026 Bách Phân Vị (Percentile Stretching).
+* **Cơ chế 2 Chế Độ (B/W \u0026 Color):**
+  - **B/W Mode:** 
+    1. Chà mượt nền giấy bằng `Bilateral Filter` để loại nhiễu râm.
+    2. Chạy `CLAHE` đẩy bật tương phản các chữ bút chì mờ nhạt chìm trong lều xám.
+    3. Trích xuất **Adaptive Threshold** bằng việc đo Bách Phân Vị (2% điểm tối nhất thành lõi mực Đen $0$, 90% điểm sáng rực thành Nền Trắng $255$). Vùng giao thoa được giãn mượt.
+    4. Hàn gắn các nứt gãy của nét chữ bằng `Morphological Close`.
+  - **Color Mode (Bản màu):**
+    1. Trích xuất không gian phân giải màu **LAB**. Tiến hành Blur cực gắt trên 2 kênh phân giải màu $A$ và $B$ (Đánh bay hoàn toàn rác hạt màu tím/xanh/đỏ trên bề mặt giấy trắng). Kênh độ sáng $L$ chứa viền chữ được bảo vệ tuyệt đối.
+    2. Tự động nội suy kéo giãn dải Histogram để trắng nền phơi sáng điểm dư thừa.
+    3. Đẩy nhẹ Saturation HSV thông minh (Chỉ đẩy ở các vùng có màu thực sự $>15$ để bảo tồn con mộc đỏ rực rõ mà không rớt màu vào nền giấy trắng).
+* **Output:** Nền ngoài trắng phau như tuyết, chữ tuyệt đối không rỗ mẻ và không bị lẹm viền. Con dấu mộc và chữ ký màu hiển thị sắc nét đỉnh cao mà không còn bất kỳ tia nhiễu xám nào. Tự hào quét tài liệu đẳng cấp Enterprise.

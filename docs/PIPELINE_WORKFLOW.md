@@ -62,18 +62,13 @@
   - Lấy từng pixel tài liệu gốc chia thẳng cho Bản đồ Phông Nền tương ứng của riêng kênh đó (`Thuyết Nguồn Sáng Kép`).
 - **Output:** Cân bằng lại cả Độ Sáng lẫn **Nhiệt Độ Màu** của vùng khuất bóng. Kết quả là một bức ảnh trắng phau nhưng duy trì nguyên vẹn màu Mực Xanh, Dấu Mộc Đỏ không dính một tì vết ám xám tàng hình nào.
 
-### 3d. Phơi sáng mềm (Soft Binarization / Linear Contrast Stretching) 🟢 Image Processing
-- **Làm gì:** Việc dùng binarize gắt (Otsu hay Adaptive) thường chém đứt pixel xám ở viền, dãn đến nét mảnh bị vỡ rỗ, gai (jagged edges) và lấp mất độ nét thanh nét đậm. Pipeline chuyển sang áp dụng **Kéo giãn tương phản tuyến tính** định vị ngưỡng 1 phần (Piecewise Linear) thông qua 2 chốt Black Point (Ngưỡng đen) & White Point (Ngưỡng trắng):
-  - Giá trị màu `≤ Black Point`: Kéo sập thành `0` (Đen nhánh lõi chữ).
-  - Giá trị màu `≥ White Point`: Kích trần thành `255` (Trắng tinh tẩy bụi).
-  - Khoảng giới hạn giữa: Duỗi thành dải xám mềm hoạt động như bộ khử răng cưa (Anti-aliasing), bảo toàn form chữ tròn vẹn.
-- **Tiêu chuẩn các Ngưỡng (Options) đang cài đặt trong mã nguồn:**
-  - `Option 2 (B:110, W:200)`: **[Đang chọn mặc định]** Cân bằng tiêu chuẩn (Đen lõi gắt, xám viền ôm mờ đủ giữ nét chữ mềm mại nguyên vẹn không đứt).
-  - `Option 1 (B:90, W:220)`: Siêu mềm mại (Xám sâu, văn bản ngả về màu chì nhẹ, độ rung rìa rộng).
-  - `Option 3 (B:130, W:190)`: Cân bằng đẩy đen (Nền trắng phau nhưng lôi bật các dải mực lờ mờ/phai thành đen nhánh). 
-  - `Option 4 (B:160, W:180)`: Rất gắt (Gần như Otsu, khung xám mỏng như dao lam, mép chữ thui lại nhưng sẽ gai nhẹ).
-  - `Option 5 (B:70, W:150)`: Phơi sáng bão hòa (Tẩy lóa trắng nền mạnh, nhưng chữ mỏng).
-- **Output:** ✅ **Ảnh tài liệu đạt chất lượng scanner chuẩn (Nền trắng lóa, viền chữ có bóng mờ lót êm ái chống vỡ nát)**.
+### 3d. Phơi Sáng Thích Ứng (Adaptive Histogram Stretching & CLAHE) 🟢 Image Processing
+- **Làm gì:** Dựa trên phân tích nhược điểm của Cắt Ngưỡng cố định (Fixed Binarize Thresholds gây cháy nếu sáng chênh lệch), Pipeline tích hợp hoàn toàn cơ chế tự thích nghi tương phản (Adaptive) 2 Chế Độ:
+  - **Tương phản cục bộ:** Dùng Mạng Phân Vùng Lưới `CLAHE` quét 8x8 pixels để đẩy bật các vùng chữ nét bút chì chìm trong lều sấp bóng râm.
+  - **Tự tính ngưỡng bách phân vị:** Kéo Histogram thành mảng 1D, lấy mốc Percentile để trích xuất linh động `Black Point` (ngưỡng triệt chữ đen $2\%$) và `White Point` (vùng nền trắng sáng cháy $95\%$).
+  - **Mượt biên tự dãn (Anti-Aliasing):** Khoảng màu giao thoa được duỗi mềm tuyến tính, bảo vệ hình thái đường cong của nét tròn mà không chém răng cưa.
+  - **Lọc Khử Nhiễu:** Trang màu được trích xuất `LAB Denoising` chỉ đánh gắt trên $A,B$ để tấy vết mực xám bẩn mà không hư font chữ; trang Đơn Màu được quét phẳng nền bằng `Bilateral Filter`.
+- **Output:** ✅ **Ảnh tài liệu đạt chất lượng scanner chuẩn Enterprise (Nền trắng đồng đều vô cực 100%, 100% không còn dính rác nhiễu Signal Noise do khuếch đại ánh sáng)**.
 
 ---
 

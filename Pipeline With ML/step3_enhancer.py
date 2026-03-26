@@ -10,13 +10,10 @@ class DocumentEnhancer:
     def __init__(self):
         pass
 
-    def enhance(self, image, save_prefix=None):
+    def enhance(self, image, save_prefix=None, mode="color"):
         """
-        Thực hiện toàn bộ pipeline khôi phục Đỉnh Cao (Mới cập nhật 4 chốt chặn):
-        0. Khôi phục lóa sáng Flash (In-painting)
-        1. Chống Rung Nhoè camera tay (Unsharp Masking)
-        2. Khử bóng & Thấm mực mặt sau (Illumination Normalization)
-        3. Tăng cường chi tiết, nối nét chữ đứt gãy (Morphology)
+        Thực hiện toàn bộ pipeline khôi phục Đỉnh Cao với Adaptive Algorithms.
+        Trích xuất 2 bản: Đen Trắng (B/W) và Màu (Color)
         """
         # (Đã tắt theo yêu cầu: Bỏ tính năng nắn xô lệch dòng chữ)
         # print("[Step 3] 📐 Đang kiểm tra và nắn thẳng dòng chữ (Deskew & Crop)...")
@@ -29,67 +26,21 @@ class DocumentEnhancer:
         if save_prefix is not None:
             cv2.imwrite(f"{save_prefix}_step3_1_deglared.jpg", deglared_img)
         
-        print("[Step 3] 🔍 Kéo gắt biên cạnh chống rung mờ (Deblurring)...")
-        sharpened_img = self.unsharp_mask(deglared_img)
+        # 1. Pipeline Đen Trắng
+        print("[Step 3 - B/W] Đang xử lý bản Đen Trắng Tối Ưu (Adaptive B/W)...")
+        bw_final = self.enhance_bw_adaptive(deglared_img)
         if save_prefix is not None:
-            cv2.imwrite(f"{save_prefix}_step3_2_sharpened.jpg", sharpened_img)
-        
-        print("[Step 3] ☁️ Khử loang lổ bóng râm (Shadow Normalization)...")
-        normalized_img = self.remove_shadows_division(sharpened_img)
+            cv2.imwrite(f"{save_prefix}_step3_final_bw.jpg", bw_final)
+            
+        # 2. Pipeline Màu
+        print("[Step 3 - Color] Đang xử lý bản Màu Tối Ưu (Adaptive Color)...")
+        color_final = self.enhance_color_adaptive(deglared_img)
         if save_prefix is not None:
-            cv2.imwrite(f"{save_prefix}_step3_3_noshadow.jpg", normalized_img)
-        
-        print("[Step 3] ✒️ Binarize thông minh (Phơi sáng mềm)... đang tạo 5 mức độ để lựa chọn")
-        
-        # 5 Cặp tham số tương quan (Black Point, White Point)
-        threshold_pairs = [
-            (90, 220),   # Option 1: Rất mềm mại (Nhiều hạt xám, như bút chì nét nhạt)
-            (110, 200),  # Option 2: Cân bằng tiêu chuẩn (Đủ đen gắt, giữ viền mượt)
-            (130, 190),  # Option 3: Chữ mạnh, nền trắng phau
-            (160, 180),  # Option 4: Cực gắt (Chữ đen đậm thui, lằn ranh xám mỏng, gần như B/W cũ)
-            (70, 150)    # Option 5: Phơi sáng chói (Tẩy trắng nền cực mạnh, giữ lại chữ vừa in)
-        ]
-        
-        final_img = None
-        for i, (bp, wp) in enumerate(threshold_pairs, 1):
-            soft_bin = self.smart_binarize(normalized_img, black_point=bp, white_point=wp)
-            # Nếu chạy trên app có lưu cache ảnh 
-            if save_prefix is not None:
-                filename = f"{save_prefix}_step3_4_opt{i}_B{bp}_W{wp}.jpg"
-                cv2.imwrite(filename, soft_bin)
-                print(f"  -> Lưu mẫu thử Option {i} (Đen:{bp}, Trắng:{wp}) ra {filename}")
+            cv2.imwrite(f"{save_prefix}_step3_final_color.jpg", color_final)
             
-            # Tạm khóa Option 2 làm chuẩn bị mặc định trả về cho Matplotlib show()
-            if i == 2: 
-                final_img = soft_bin
-                
-        # --- TÍNH NĂNG MỚI: XỬ LÝ ẢNH MÀU NGUYÊN BẢN ---
-        print("[Step 3] 🎨 Tái tạo ảnh Màu sắc (Color Mode)... Tẩy trắng nền giữ nguyên màu sắc chữ, dấu mộc")
-        color_noshadow = self.remove_shadows_division_color(sharpened_img)
-        
-        # 5 Cặp tham số tương quan cho CHẾ ĐỘ ẢNH MÀU
-        color_threshold_pairs = [
-            (30, 240),  # Option 6: Giữ Trọn Vẹn Cả Màu Siêu Nhạt (Bút highlight nhạt, phấn màu, logo chìm)
-            (40, 230),  # Option 7: Cân Bằng Chuẩn Màu Sắc (Trắng tinh khôi, màu dịu mắt tự nhiên)
-            (50, 210),  # Option 8: Dấu Mộc Đậm Hơn, Nền Trắng Sáng
-            (60, 190),  # Option 9: Gắt - Chữ đen nhánh & Mộc Đỏ Chót, Nền Cháy Sáng
-            (70, 170)   # Option 10: Siêu Gắt - Ép mọi màu nhạt rực rỡ lên tối đa
-        ]
-        
-        best_color_enhanced = None
-        for i, (bp, wp) in enumerate(color_threshold_pairs, 6):
-            color_enhanced = self.enhance_color(color_noshadow, bp=float(bp), wp=float(wp))
-            
-            if save_prefix is not None:
-                filename = f"{save_prefix}_step3_4_opt{i}_Color_B{bp}_W{wp}.jpg"
-                cv2.imwrite(filename, color_enhanced)
-                print(f"  -> Lưu mẫu thử Ảnh Màu Opt {i} (Đen:{bp}, Trắng:{wp}) ra {filename}")
-                
-            if i == 7: # Option 7 (40-230) là mức tiêu chuẩn vàng, ta lấy làm đại diện nếu muốn return
-                best_color_enhanced = color_enhanced
-            
-        # Có thể return best_color_enhanced nếu muốn show bản màu lên cuối cùng, hoặc return final_img
-        return best_color_enhanced
+        if mode == "bw":
+            return bw_final
+        return color_final
 
     def deskew_and_crop(self, image):
         """
@@ -234,53 +185,84 @@ class DocumentEnhancer:
         
         return normalized_color
 
-    def enhance_color(self, normalized_color, bp=40.0, wp=230.0):
+    def enhance_bw_adaptive(self, deglared_img):
         """
-        Thổi bay bóng râm mờ còn sót lại và nâng mức bão hòa màu sắc.
+        Pipeline Đen Trắng Tối Ưu bằng Adaptive Threshold & CLAHE
         """
-        # 1. Soft Binarization TRÊN CẢ 3 KÊNH MÀU
-        # (CẬP NHẬT NGƯỠNG RẤT NHẸ): Do đã khử bóng triệt để ở bước trên, nền giấy lúc này rất gần 255.
-        # Chúng ta chỉ nên ép nhẹ những phổ xám > wp thành Trắng tinh, và kéo màu nhạt xuống xíu (bp).
-        # Tuyệt đối không để wp quá thấp (185) trừ phi cố tình muốn gắt màu.
+        # 1. Khử bóng bằng remove_shadows_division
+        noshadow = self.remove_shadows_division(deglared_img)
         
-        stretched = (normalized_color.astype(np.float32) - bp) * (255.0 / (wp - bp))
-        stretched_color = np.clip(stretched, 0, 255).astype(np.uint8)
+        # 2. Khử nhiễu cục bộ: bilateralFilter mượt nền giấy nhưng giữ viền chữ rất tốt
+        smooth = cv2.bilateralFilter(noshadow, d=5, sigmaColor=50, sigmaSpace=50)
         
-        # 2. Chuyển sang không gian màu HSV để kích bão hòa (Đâm chồi màu sắc)
-        hsv = cv2.cvtColor(stretched_color, cv2.COLOR_BGR2HSV).astype(np.float32)
+        # 3. CLAHE để đẩy mạnh tương phản cục bộ chữ mờ
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        clahe_img = clahe.apply(smooth)
+
+        # 4. Phơi sáng mềm tuyến tính kẹp đầu đuôi (Adaptive Percentile)
+        p_low, p_high = np.percentile(clahe_img, (2, 90)) # 2% tối nhất thành Đen, 10% sáng nhất thành Trắng
+        
+        # Đảm bảo khoảng cách logic
+        if p_high - p_low < 10:
+            p_high = min(255, p_low + 10)
+            
+        stretched = (clahe_img.astype(np.float32) - p_low) * (255.0 / (p_high - p_low))
+        soft_bin = np.clip(stretched, 0, 255).astype(np.uint8)
+        
+        # 5. Nối đứt gãy bằng Morphology Close 2x2
+        inv = cv2.bitwise_not(soft_bin)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        inv_connected = cv2.morphologyEx(inv, cv2.MORPH_CLOSE, kernel)
+        bw_connected = cv2.bitwise_not(inv_connected)
+        
+        # 6. Làm viền chống rung
+        final_bw = self.unsharp_mask(bw_connected)
+        return final_bw
+
+    def enhance_color_adaptive(self, deglared_img):
+        """
+        Pipeline Bản Màu Tối Ưu bằng LAB Denoising và Histogram Auto-Stretching
+        """
+        # 1. Khử bóng độc lập RGB
+        color_noshadow = self.remove_shadows_division_color(deglared_img)
+        
+        # 2. Khử hạt nhiễu màu trên vùng tối kéo sáng (LAB Denoising)
+        lab = cv2.cvtColor(color_noshadow, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        # Lọc cực gắt Blur trên kênh màu A và B (Khử nhiễu tím/xanh/vàng)
+        a = cv2.GaussianBlur(a, (5, 5), 0)
+        b = cv2.GaussianBlur(b, (5, 5), 0)
+        # Kênh L (độ sáng) giữ nguyên độ sắc nét của viền chữ
+        lab_denoised = cv2.merge([l, a, b])
+        color_denoised = cv2.cvtColor(lab_denoised, cv2.COLOR_LAB2BGR)
+        
+        # 3. Adaptive Histogram Stretching (Mềm) tính trên Grayscale cho chuẩn sáng
+        gray_for_stats = cv2.cvtColor(color_denoised, cv2.COLOR_BGR2GRAY)
+        p_low, p_high = np.percentile(gray_for_stats, (1, 95))
+        
+        if p_high - p_low < 10:
+            p_high = min(255, p_low + 10)
+            
+        stretched_color = (color_denoised.astype(np.float32) - p_low) * (255.0 / (p_high - p_low))
+        stretched_color = np.clip(stretched_color, 0, 255).astype(np.uint8)
+        
+        # 4. Tăng bão hòa thông minh (Chỉ tăng pixel có màu, không tăng giấy trắng)
+        hsv = cv2.cvtColor(stretched_color, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         
-        # Tăng Saturation (độ rực rỡ) lên 30% để mực nét hơn, con dấu đỏ chót hơn
-        s = s * 1.3
-        s = np.clip(s, 0, 255)
+        # Tăng Saturation 30% ở những chỗ S > 15 (Giấy trắng xám thường có S rất thấp < 10)
+        mask_color = s > 15
+        s_float = s.astype(np.float32)
+        s_float[mask_color] = s_float[mask_color] * 1.3
+        s = np.clip(s_float, 0, 255).astype(np.uint8)
         
-        hsv_enhanced = cv2.merge([h, s, v]).astype(np.uint8)
+        hsv_enhanced = cv2.merge([h, s, v])
         enhanced_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
         
-        # 3. Áp dụng bộ lọc Unsharp Masking 1 lần nữa ở layer cuối cùng để sắc bén
-        gaussian = cv2.GaussianBlur(enhanced_bgr, (0, 0), 2.0)
-        final_sharp = cv2.addWeighted(enhanced_bgr, 1.2, gaussian, -0.2, 0)
+        # 5. Chốt hạ: Viền chống rung
+        final_color = self.unsharp_mask(enhanced_bgr)
         
-        return final_sharp
-
-    def smart_binarize(self, gray_image, black_point=110.0, white_point=200.0):
-        """
-        [ĐÃ SỬA THEO YÊU CẦU: SOFT BINARIZATION]
-        Giữ lại các pixel xám mượt ở biên chữ (anti-aliasing) để tránh gai vỡ hay đứt chữ mảnh.
-        Ép vùng lõi chữ thành Đen nhánh và nền thành Trắng tinh dựa trên Point Thresholds.
-        """
-        # Xác định điểm Đen (Black Point) và điểm Trắng (White Point)
-        # Pixel <= black_point sẽ chuyển thành 0 (Đen tuyệt đối)
-        # Pixel >= white_point sẽ chuyển thành 255 (Trắng tuyệt đối)
-        # Vùng ở giữa biến thành xám trung gian làm mượt rìa chữ.
-        
-        # Phép chiếu biến đổi tuyến tính (Linear Contrast Stretching)
-        stretched = (gray_image.astype(np.float32) - float(black_point)) * (255.0 / float(white_point - black_point))
-        
-        # Cắt gọt chuẩn hóa kết quả vào dải uint8 (0-255)
-        soft_binary = np.clip(stretched, 0, 255).astype(np.uint8)
-        
-        return soft_binary
+        return final_color
 
 if __name__ == "__main__":
     print("Test Enhancement...")

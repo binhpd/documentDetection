@@ -428,6 +428,7 @@ def main():
     parser.add_argument('--dewarp-ml', action='store_true', help='Use page-dewarp (AI text-line analysis) to flatten the document. Slower but flattens curved pages.')
     parser.add_argument("--uvdoc", action="store_true", help="Sửa cong rách nát tài liệu bằng Neural Grid UVDoc (chuyên dụng xử lý độ cong sâu sắc)")
     parser.add_argument("--yolo", type=str, default="models/yolov8n-seg.pt", help="Đường dẫn đến mô hình YOLOv8 segmentation (mặc định: models/yolov8n-seg.pt)")
+    parser.add_argument("--bw", action="store_true", help="Tăng cường và xuất File ảnh dạng Đen Trắng (B/W) ở Step 3 thay vì bản Màu gốc")
     args = parser.parse_args()
 
     # ── Xác định ảnh đầu vào ──
@@ -626,10 +627,11 @@ def main():
                 print(f"  ⚠️ Tọa độ trả về không đủ 4 điểm ({len(result['corners'])} điểm). Bỏ qua hiển thị góc.")
                 
             # ── Step 3: Enhancement ──
-            print(f"\n[Step 3] Enhancement (Shadow Removal & Binarization)...")
-            enhanced = detector.enhancer.enhance(warped, save_prefix=save_prefix)
+            print(f"\n[Step 3] Enhancement (Shadow Removal, CLAHE & Binarization)...")
+            mode = "bw" if args.bw else "color"
+            enhanced = detector.enhancer.enhance(warped, save_prefix=save_prefix, mode=mode)
             result['enhanced'] = enhanced
-            print(f"  ✓ Đã tăng cường chất lượng ảnh!")
+            print(f"  ✓ Đã tăng cường chất lượng ảnh (Chế độ: {mode.upper()})!")
             
         except Exception as e:
             print(f"  ❌ Lỗi transform hoặc enhancement: {e}")
