@@ -57,7 +57,7 @@ class CoonsPatchDewarper:
         rect[3] = pts[np.argmax(diff)]
         return rect
 
-    def dewarp_via_contour(self, img, mask, corners):
+    def dewarp_via_contour(self, img, mask, corners, save_prefix=None):
         """
         Warp an image based on the curved mask contours to a completely flat rectangle.
         corners: 4 document corners (any order).
@@ -66,6 +66,10 @@ class CoonsPatchDewarper:
         if not contours:
             return img
         
+        if save_prefix is not None:
+            vis_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            cv2.imwrite(f"{save_prefix}_step2_coons_1a_mask.jpg", vis_mask)
+
         c = max(contours, key=cv2.contourArea).squeeze()
         if c.ndim == 1:
             c = c.reshape(-1, 2)

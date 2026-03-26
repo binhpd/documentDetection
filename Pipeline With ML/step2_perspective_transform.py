@@ -42,7 +42,7 @@ class PerspectiveTransformer:
 
         return rect
 
-    def transform(self, image, corners):
+    def transform(self, image, corners, save_prefix=None):
         """
         Thực hiện biến đổi phối cảnh 4 góc (Perspective Transform).
         
@@ -60,6 +60,13 @@ class PerspectiveTransformer:
         # Đảm bảo thứ tự chuẩn
         rect = self._order_points(corners)
         (tl, tr, br, bl) = rect
+
+        if save_prefix is not None:
+            vis = image.copy()
+            for i, pt in enumerate(rect):
+                cv2.circle(vis, (int(pt[0]), int(pt[1])), 15, (0, 0, 255), -1)
+                cv2.putText(vis, str(i), (int(pt[0])+10, int(pt[1])+10), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+            cv2.imwrite(f"{save_prefix}_step2_1a_corners_marked.jpg", vis)
 
         # --- TÍNH TOÁN KÍCH THƯỚC ẢNH ĐẦU RA (Destination Image) ---
         # 1. Chiều rộng (Width) mới: Lớn nhất giữa cạnh trên (tr-tl) và cạnh dưới (br-bl)

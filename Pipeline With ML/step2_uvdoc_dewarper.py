@@ -55,7 +55,7 @@ class UVDocDewarper:
                 except Exception as e2:
                     print(f"❌ Lỗi lùi về CPU: {e2}")
 
-    def dewarp(self, img_cropped):
+    def dewarp(self, img_cropped, save_prefix=None):
         """
         Nắn phẳng tài liệu bằng lưới (Neural Grid-based Document Unwarping).
         
@@ -72,12 +72,15 @@ class UVDocDewarper:
             
         print("[UVDocDewarper] 🧠 Đang suy luận lưới nắn phẳng (Neural Grid)...")
         try:
+            if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step2_uvdoc_1a_cropped.jpg", img_cropped)
+            
             # 1. Chuyển đổi định dạng cho PyTorch: RGB, normalize [0, 1]
             # UVDoc utils cần kích thước (1, 3, 488, 712)
             img_rgb = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
             
             # 2. Resize kích thước ảnh về IMG_SIZE để đẩy qua mạng
             inp_resized = cv2.resize(img_rgb, tuple(IMG_SIZE))
+            if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step2_uvdoc_1b_resized.jpg", (inp_resized * 255).astype(np.uint8)[:,:,::-1])
             # HWC -> CHW, tạo batch dim
             inp_tensor = torch.from_numpy(inp_resized.transpose(2, 0, 1)).unsqueeze(0).to(self.device)
 

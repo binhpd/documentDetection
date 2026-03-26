@@ -83,7 +83,7 @@ class DocumentDetector:
         self.contour_detector = DummyDetector()
         self.hough_detector = DummyDetector()
 
-    def detect(self, image):
+    def detect(self, image, save_prefix=None):
         """Phát hiện 4 góc tài liệu trong ảnh.
         
         Args:
@@ -102,7 +102,7 @@ class DocumentDetector:
         orig = image.copy()
 
         # ── 1a. Tiền xử lý ──
-        blurred, resized, ratio = self.preprocessor.process(image)
+        blurred, resized, ratio = self.preprocessor.process(image, save_prefix=save_prefix)
         print(f"[1a] Tiền xử lý: {image.shape} → resize {resized.shape}, ratio={ratio:.2f}  ✓")
 
         # ── 1b. Edge Detection (HED hoặc Canny) ──
@@ -489,10 +489,10 @@ def main():
 
     # Nếu đang bật U2-Net, hãy chạy hàm detect một cách trọn vẹn thay vì shortcut như YOLO/DocAligner
     if args.u2net:
-        result = detector.detect(orig)
+        result = detector.detect(orig, save_prefix=save_prefix)
     else:
         # Nhánh hybrid cũ cho YOLO / DocAligner
-        blurred, resized, ratio = detector.preprocessor.process(orig)
+        blurred, resized, ratio = detector.preprocessor.process(orig, save_prefix=save_prefix)
         print(f"[1a] Tiền xử lý: {orig.shape} → resize {resized.shape}  ✓")
         
         if args.docaligner:
@@ -582,7 +582,7 @@ def main():
                     from step2_perspective_transform import PerspectiveTransformer
                     cv_transformer = PerspectiveTransformer()
                     # CRITICAL FIX: Dùng img_for_dewarp (đã là u2net_doc có padding nền trắng) thay vì ảnh orig dính background lề cỏ!
-                    anti_pinch_warped = cv_transformer.transform(img_for_dewarp, corners_for_dewarp)
+                    anti_pinch_warped = cv_transformer.transform(img_for_dewarp, corners_for_dewarp, save_prefix=save_prefix)
                     args.uvdoc = False
                 elif args.uvdoc and corners_for_dewarp is not None and len(corners_for_dewarp) == 4 and not is_flat:
                     print(f"  🌟 [Auto-Correction] Phát hiện ĐƯỜNG CONG rệt. UVDoc Dewarp sẽ được giữ nguyên!")
@@ -598,7 +598,7 @@ def main():
                     print(f"[Step 2] Áp dụng Coons Patch Mesh Deformation nắn phẳng viền cong...")
                     from step2_coons_patch import CoonsPatchDewarper
                     coons_dewarper = CoonsPatchDewarper()
-                    img_for_dewarp = coons_dewarper.dewarp_via_contour(img_for_dewarp, result['u2net_mask'], corners_for_dewarp)
+                    img_for_dewarp = coons_dewarper.dewarp_via_contour(img_for_dewarp, result['u2net_mask'], corners_for_dewarp, save_prefix=save_prefix)
                     print(f"  ✓ Đã vuốt thẳng bằng Coons Patch: {img_for_dewarp.shape[1]}x{img_for_dewarp.shape[0]}")
                     result['coons_warped'] = img_for_dewarp
                     corners_for_dewarp = None # Tắt PerspectiveTransform cũ của page-dewarp
@@ -610,7 +610,7 @@ def main():
             if anti_pinch_warped is not None:
                 warped = anti_pinch_warped
             else:
-                warped = detector.transformer.dewarp(img_for_dewarp) if args.uvdoc else (detector.transformer.dewarp(img_for_dewarp, corners_for_dewarp) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img_for_dewarp, corners_for_dewarp))
+                warped = detector.transformer.dewarp(img_for_dewarp, save_prefix=save_prefix) if args.uvdoc else (detector.transformer.dewarp(img_for_dewarp, corners_for_dewarp, save_prefix=save_prefix) if hasattr(detector.transformer, 'dewarp') else detector.transformer.transform(img_for_dewarp, corners_for_dewarp, save_prefix=save_prefix))
             result['warped'] = warped
             cv2.imwrite(f"{save_prefix}_step2_dewarped.jpg", warped)
             

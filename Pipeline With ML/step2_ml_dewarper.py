@@ -47,7 +47,7 @@ class MLDewarper:
             self.model_loaded = False
         return self.model_loaded
 
-    def dewarp(self, image, corners=None):
+    def dewarp(self, image, corners=None, save_prefix=None):
         """
         Là phẳng ảnh tài liệu cong bằng phân tích dòng chữ (page_dewarp).
         
@@ -61,14 +61,14 @@ class MLDewarper:
         # Nếu model không tồn tại → chạy Fallback
         if not self.model_loaded:
             if self.fallback and corners is not None:
-                return self.fallback.transform(image, corners)
+                return self.fallback.transform(image, corners, save_prefix=save_prefix)
             return image
 
         # 1. Cắt ảnh (Crop) bằng Perspective Transform trước
         cropped_image = image
         if self.fallback and corners is not None:
              print("[ML Dewarp] ✂️ Đang cắt vùng tài liệu dựa trên 4 góc...")
-             cropped_image = self.fallback.transform(image, corners)
+             cropped_image = self.fallback.transform(image, corners, save_prefix=save_prefix)
 
         print("[ML Dewarp] 🧠 Đang phân tích độ cong dòng chữ (Text-line Dewarping)...")
         

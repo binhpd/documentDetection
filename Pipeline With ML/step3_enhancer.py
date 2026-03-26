@@ -28,13 +28,13 @@ class DocumentEnhancer:
         
         # 1. Pipeline Đen Trắng
         print("[Step 3 - B/W] Đang xử lý bản Đen Trắng Tối Ưu (Adaptive B/W)...")
-        bw_final = self.enhance_bw_adaptive(deglared_img)
+        bw_final = self.enhance_bw_adaptive(deglared_img, save_prefix)
         if save_prefix is not None:
             cv2.imwrite(f"{save_prefix}_step3_final_bw.jpg", bw_final)
             
         # 2. Pipeline Màu
         print("[Step 3 - Color] Đang xử lý bản Màu Tối Ưu (Adaptive Color)...")
-        color_final = self.enhance_color_adaptive(deglared_img)
+        color_final = self.enhance_color_adaptive(deglared_img, save_prefix)
         if save_prefix is not None:
             cv2.imwrite(f"{save_prefix}_step3_final_color.jpg", color_final)
             
@@ -185,19 +185,22 @@ class DocumentEnhancer:
         
         return normalized_color
 
-    def enhance_bw_adaptive(self, deglared_img):
+    def enhance_bw_adaptive(self, deglared_img, save_prefix=None):
         """
         Pipeline Đen Trắng Tối Ưu bằng Adaptive Threshold & CLAHE
         """
         # 1. Khử bóng bằng remove_shadows_division
         noshadow = self.remove_shadows_division(deglared_img)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_1_noshadow.jpg", noshadow)
         
         # 2. Khử nhiễu cục bộ: bilateralFilter mượt nền giấy nhưng giữ viền chữ rất tốt
         smooth = cv2.bilateralFilter(noshadow, d=5, sigmaColor=50, sigmaSpace=50)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_2_smooth.jpg", smooth)
         
         # 3. CLAHE để đẩy mạnh tương phản cục bộ chữ mờ
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         clahe_img = clahe.apply(smooth)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_3_clahe.jpg", clahe_img)
 
         # 4. Phơi sáng mềm tuyến tính kẹp đầu đuôi (Adaptive Percentile)
         p_low, p_high = np.percentile(clahe_img, (2, 90)) # 2% tối nhất thành Đen, 10% sáng nhất thành Trắng
@@ -208,23 +211,26 @@ class DocumentEnhancer:
             
         stretched = (clahe_img.astype(np.float32) - p_low) * (255.0 / (p_high - p_low))
         soft_bin = np.clip(stretched, 0, 255).astype(np.uint8)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_4_soft_bin.jpg", soft_bin)
         
         # 5. Nối đứt gãy bằng Morphology Close 2x2
         inv = cv2.bitwise_not(soft_bin)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
         inv_connected = cv2.morphologyEx(inv, cv2.MORPH_CLOSE, kernel)
         bw_connected = cv2.bitwise_not(inv_connected)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_5_connected.jpg", bw_connected)
         
         # 6. Làm viền chống rung
         final_bw = self.unsharp_mask(bw_connected)
         return final_bw
 
-    def enhance_color_adaptive(self, deglared_img):
+    def enhance_color_adaptive(self, deglared_img, save_prefix=None):
         """
         Pipeline Bản Màu Tối Ưu bằng LAB Denoising và Histogram Auto-Stretching
         """
         # 1. Khử bóng độc lập RGB
         color_noshadow = self.remove_shadows_division_color(deglared_img)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_1_noshadow.jpg", color_noshadow)
         
         # 2. Khử hạt nhiễu màu trên vùng tối kéo sáng (LAB Denoising)
         lab = cv2.cvtColor(color_noshadow, cv2.COLOR_BGR2LAB)
@@ -235,6 +241,7 @@ class DocumentEnhancer:
         # Kênh L (độ sáng) giữ nguyên độ sắc nét của viền chữ
         lab_denoised = cv2.merge([l, a, b])
         color_denoised = cv2.cvtColor(lab_denoised, cv2.COLOR_LAB2BGR)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_2_denoised.jpg", color_denoised)
         
         # 3. Adaptive Histogram Stretching (Mềm) tính trên Grayscale cho chuẩn sáng
         gray_for_stats = cv2.cvtColor(color_denoised, cv2.COLOR_BGR2GRAY)
@@ -245,6 +252,7 @@ class DocumentEnhancer:
             
         stretched_color = (color_denoised.astype(np.float32) - p_low) * (255.0 / (p_high - p_low))
         stretched_color = np.clip(stretched_color, 0, 255).astype(np.uint8)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_3_stretched.jpg", stretched_color)
         
         # 4. Tăng bão hòa thông minh (Chỉ tăng pixel có màu, không tăng giấy trắng)
         hsv = cv2.cvtColor(stretched_color, cv2.COLOR_BGR2HSV)
@@ -258,6 +266,7 @@ class DocumentEnhancer:
         
         hsv_enhanced = cv2.merge([h, s, v])
         enhanced_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_4_enhanced_saturation.jpg", enhanced_bgr)
         
         # 5. Chốt hạ: Viền chống rung
         final_color = self.unsharp_mask(enhanced_bgr)

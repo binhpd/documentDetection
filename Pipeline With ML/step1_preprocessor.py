@@ -47,15 +47,13 @@ class Preprocessor:
         """Áp dụng Gaussian Blur để giảm nhiễu."""
         return cv2.GaussianBlur(gray_image, self.blur_kernel, 0)
 
-    def process(self, image):
-        """Pipeline đầy đủ: resize → grayscale → blur.
-        
-        Returns:
-            blurred: Ảnh xám đã blur (trên ảnh đã resize)
-            resized: Ảnh màu đã resize (dùng để hiển thị)
-            ratio: Tỷ lệ scale về ảnh gốc
-        """
+    def process(self, image, save_prefix=None):
+        """Pipeline đầy đủ: resize → grayscale → blur."""
         resized, ratio = self.resize(image)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step1_0a_resized.jpg", resized)
+        
         gray = self.to_grayscale(resized)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step1_0b_gray.jpg", gray)
+        
         blurred = self.blur(gray)
         return blurred, resized, ratio
