@@ -45,7 +45,7 @@ Và yếu huyệt lớn nhất thứ ba: Các phép toán trên đều ép bức
 
 ### SLIDE 6: MỤC TIÊU VÀ PHẠM VI DỰ ÁN
 **Lời thoại:** 
-"Từ những thách thức trên, mục tiêu của dự án Nhóm 6 được định hình rất rõ ràng: Nhóm khao khát xây dựng một hệ thống giải pháp có khả năng nhận diện và căn chỉnh tự động tài liệu thông qua hình ảnh thu thập trực tiếp từ thiết bị di động cá nhân (Smartphone). 
+"Từ những thách thức trên, mục tiêu của dự án Nhóm 6 được định hình rất rõ ràng: Nhóm mong muốn xây dựng một hệ thống giải pháp có khả năng nhận diện và căn chỉnh tự động tài liệu thông qua hình ảnh thu thập trực tiếp từ thiết bị di động cá nhân (Smartphone). 
 Yêu cầu cốt lõi là hệ thống phải xử lý tốt trong đa dạng các điều kiện ánh sáng và các tình trạng vật lý phức tạp của giấy tờ (nhăn, cong vênh, bóng đổ rải rác). 
 Đặc biệt, quy trình này không chỉ **tăng cường sắc nét độ tương phản** của chữ viết, mà còn bắt buộc **vẫn giữ gìn nguyên vẹn đặc trưng nét chữ, màu mực gốc và cái hồn chất liệu (texture) nguyên bản của mặt giấy.**
 Kết quả chuyên nghiệp đầu ra luôn hướng tới mục đích cao nhất: Đáp ứng xuất sắc toàn bộ quy chuẩn của công tác **số hóa chuyển đổi điện tử và lưu trữ tài liệu giấy tờ hàng ngày** trong đời sống và văn phòng."
