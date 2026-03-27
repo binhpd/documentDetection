@@ -98,6 +98,78 @@ class DocumentEnhancer:
             
         return image
 
+    def auto_crop_gray_borders(self, image, margin=100):
+        """
+        [NEW] Phát hiện các vệt rác đen/xám ở 4 viền và tiến hành CẮT BỎ (Crop) 
+        để loại bỏ hoàn toàn dải pixel dơ mà Inpainting chưa xử lý tốt,
+        giới hạn tối đa 100px cắt vào từ mép.
+        """
+        h, w = image.shape[:2]
+        
+        # Chuyển về xám nếu ảnh màu
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image.copy()
+            
+        # Dùng Otsu để tách Mực/Rác đen (255) và Nền giấy (0)
+        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        
+        # Giới hạn không gian tìm kiếm rác trong biên margin
+        edge_mask = np.zeros((h, w), dtype=np.uint8)
+        edge_mask[:margin, :] = 1
+        edge_mask[h-margin:, :] = 1
+        edge_mask[:, :margin] = 1
+        edge_mask[:, w-margin:] = 1
+        
+        dark_edges = cv2.bitwise_and(thresh, thresh, mask=edge_mask)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(dark_edges, connectivity=8)
+        
+        # Tọa độ cắt mặc định (Giữ nguyên ảnh)
+        crop_top = 0
+        crop_bottom = h
+        crop_left = 0
+        crop_right = w
+        
+        for i in range(1, num_labels):
+            x, y, w_box, h_box, area = stats[i]
+            if area > 15:
+                # Kiểm tra khối rác chạm vào viền nào?
+                is_top = (y <= 5)
+                is_bottom = (y + h_box >= h - 5)
+                is_left = (x <= 5)
+                is_right = (x + w_box >= w - 5)
+                
+                # Logic xác định độ sâu cắt an toàn (không cắt bậy bạ cột đứng thành ngang)
+                if is_top and (w_box > h_box * 1.5 or h_box <= margin):
+                    crop_top = max(crop_top, y + h_box)
+                
+                if is_bottom and (w_box > h_box * 1.5 or h_box <= margin):
+                    crop_bottom = min(crop_bottom, y)
+                    
+                if is_left and (h_box > w_box * 1.5 or w_box <= margin):
+                    crop_left = max(crop_left, x + w_box)
+                    
+                if is_right and (h_box > w_box * 1.5 or w_box <= margin):
+                    crop_right = min(crop_right, x)
+                    
+        # Ràng buộc an toàn: Không được cắt quá giới hạn 'margin' đã đề ra
+        crop_top = min(crop_top, margin)
+        crop_bottom = max(crop_bottom, h - margin)
+        crop_left = min(crop_left, margin)
+        crop_right = max(crop_right, w - margin)
+        
+        # Thêm 2 pixel lấn sâu để gọt đứt rễ vết dơ
+        if crop_top > 0: crop_top = min(crop_top + 2, margin)
+        if h - crop_bottom > 0: crop_bottom = max(crop_bottom - 2, h - margin)
+        if crop_left > 0: crop_left = min(crop_left + 2, margin)
+        if w - crop_right > 0: crop_right = max(crop_right - 2, w - margin)
+        
+        # Thực hiện việc CẮT xén ảnh
+        if crop_top < crop_bottom and crop_left < crop_right:
+            return image[crop_top:crop_bottom, crop_left:crop_right]
+        return image
+
     def remove_glare(self, image):
         """
         Khắc phục Vấn đề 4: Lóa sáng Flash (Glare/Reflection).
@@ -197,6 +269,11 @@ class DocumentEnhancer:
         smooth = cv2.bilateralFilter(noshadow, d=5, sigmaColor=50, sigmaSpace=50)
         if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_2_smooth.jpg", smooth)
         
+        # 2.5 Phát hiện và tẩy rác rìa (Inpainting) trong vùng 100 pixels
+        print("[Step 3 - B/W] ✂️ Nhận diện lề rác xám 100px & Auto-Crop cắt tự động...")
+        smooth = self.auto_crop_gray_borders(smooth, margin=100)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_bw_2_5_edge_cropped.jpg", smooth)
+        
         # 3. CLAHE để đẩy mạnh tương phản cục bộ chữ mờ
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         clahe_img = clahe.apply(smooth)
@@ -242,6 +319,11 @@ class DocumentEnhancer:
         lab_denoised = cv2.merge([l, a, b])
         color_denoised = cv2.cvtColor(lab_denoised, cv2.COLOR_LAB2BGR)
         if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_2_denoised.jpg", color_denoised)
+        
+        # 2.5 Phát hiện và tẩy rác rìa (Inpainting) trong vùng 100 pixels
+        print("[Step 3 - Color] ✂️ Nhận diện lề rác xám 100px & Auto-Crop cắt tự động...")
+        color_denoised = self.auto_crop_gray_borders(color_denoised, margin=100)
+        if save_prefix is not None: cv2.imwrite(f"{save_prefix}_step3_color_2_5_edge_cropped.jpg", color_denoised)
         
         # 3. Adaptive Histogram Stretching (Mềm) tính trên Grayscale cho chuẩn sáng
         gray_for_stats = cv2.cvtColor(color_denoised, cv2.COLOR_BGR2GRAY)

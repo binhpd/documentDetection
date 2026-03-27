@@ -1,114 +1,126 @@
 # KỊCH BẢN THUYẾT TRÌNH BẢO VỆ ĐỒ ÁN (SPEAKER NOTES)
-*Tài liệu này cung cấp lời thoại chi tiết cho từng Slide (từ 1 đến 17), đặc biệt lồng ghép bài toán cực kỳ kinh điển: "Làm trắng nền giấy vướng bóng râm nhưng tuyệt đối không được giết chết màu sắc của con dấu đỏ hay chữ ký xanh".*
+*Tài liệu này cung cấp lời thoại chi tiết cho từng slide (từ 1 đến 17), tập trung vào bài toán cốt lõi: "Làm trắng nền giấy bị khuất bóng nhưng vẫn giữ nguyên màu sắc chân thực của con dấu đỏ và chữ ký xanh".*
 
 ---
 
 ### SLIDE 1: TRANG BÌA
 **Lời mở đầu:** 
-"Kính chào hội đồng ban giám khảo và các thầy cô. Hôm nay, đại diện Nhóm 6, em xin phép trình bày đồ án môn Xử lý Ảnh và Video với đề tài: **Giải pháp khôi phục và tăng cường chất lượng hình ảnh tài liệu quét từ thiết bị di động bằng Hybrid Machine Learning.**"
+"Kính chào hội đồng ban giám khảo và các quý thầy cô. Hôm nay, đại diện Nhóm 6, em xin phép trình bày đồ án môn Xử lý Ảnh và Video với đề tài: **Giải pháp khôi phục và tăng cường chất lượng hình ảnh tài liệu quét từ thiết bị di động bằng Hybrid Machine Learning.**"
 
 ---
 
 ### SLIDE 2: NỘI DUNG BÁO CÁO (AGENDA)
 **Lời thoại:** 
-"Buổi báo cáo hôm nay của nhóm sẽ đi qua 5 trọng tâm chính: Khởi đầu bằng việc mổ xẻ những thách thức khắc nghiệt của môi trường vật lý. Tiếp đến là giới hạn của các công cụ cũ. Trọng tâm cốt lõi là việc nhóm lai tạo AI vào đường ống OpenCV (Hybrid Pipeline). Sau đó, nhóm sẽ đo lường hiệu năng kiến trúc, và chốt lại bằng kết quả thực nghiệm trực quan."
+"Buổi báo cáo hôm nay của nhóm sẽ đi qua 5 nội dung chính: Đầu tiên là phân tích những khó khăn của môi trường chụp ảnh thực tế. Tiếp đến là những hạn chế của các phương pháp xử lý truyền thống. Trọng tâm của nhóm là sự kết hợp giữa mô hình machine learning và các thuật toán chuyên sâu về xử lý ảnh số, được xây dựng và phát triển dựa trên nền tảng thư viện mã nguồn mở OpenCV (mô hình Hybrid Pipeline). Sau đó, nhóm sẽ đánh giá hiệu năng của hệ thống, và cuối cùng là các kết quả thực nghiệm đạt được."
 
 ---
 
-### SLIDE 3: NHÓM THÁCH THỨC VẬT LÝ CỰC ĐOAN (🔥 ĐIỂM NHẤN)
+### SLIDE 3: CÁC NHÓM THÁCH THỨC TỪ MÔI TRƯỜNG THỰC TẾ
 **Lời thoại:** 
-"Để biến chiếc điện thoại thành một cỗ máy scan công nghiệp, chúng ta phải giải bài toán nhiễu loạn môi trường. Rung tay, giấy quăn xé góc hay thảm nền rườm rà vốn dĩ đã khó. 
-Nhưng sự đánh đố lớn nhất của đồ án này nằm ở **Dòng Giao Thoa Ánh Sáng và Chênh Lệch Màu Sắc**. Khi người dùng cúi xuống chụp, bóng lưng hoặc bóng cánh tay đổ sập xuống mặt giấy tạo ra các mảng chênh sáng mù mịt hắt hiu (Illumination variance).
-**Thách thức tối thượng đặt ra là:** Thuật toán bắt buộc phải bóc gỡ được lớp bóng râm đen đặc đó, đẩy nền giấy về chuẩn Trắng Sáng tinh khiết, **NHƯNG... không được tẩy bay màu sắc gốc của văn bản.** Nếu một văn bản pháp lý có Con Dấu Mộc Đỏ hoặc Chữ Ký Bút Bi Xanh mà đưa qua app Scan bị tẩy phai ra màu xám xịt hay ám đen cộc lốc, thì giá trị của bản Scan đó hoàn toàn VÔ DỤNG."
+"Để biến chiếc camera điện thoại thành một máy scan đúng nghĩa, thực tế chúng ta phải giải quyết **4 nhóm thách thức vật lý cốt lõi**:
+Thứ nhất là **Biến dạng hình học**: Từ việc ảnh bị lệch góc phối cảnh, mép giấy quăn, bề mặt nhăn nheo lồi lõm cho đến độ uốn cong phức tạp của gáy sách.
+Thứ hai là **Sai hỏng tiêu cự và Rung máy**: Gồm tình trạng ảnh bị rung mờ (motion blur) do thao tác tay hay bị nhòe do thiết bị mất điểm lấy nét.
+Thứ ba là **Sự xuống cấp bề mặt tài liệu**: Chẳng hạn như nền giấy ố vàng, nét mực phai mờ đứt đoạn, hay vết hằn mực từ mặt sau xuyên qua giấy mỏng.
+Và cuối cùng - cũng là **khó khăn lớn nhất** thuộc nhóm **Giao thoa ánh sáng**: **Hiện tượng phân bố ánh sáng không đồng đều và sai lệch màu sắc**. Khi người dùng thao tác, bóng đổ của cơ thể, vết lóa của đèn huỳnh quang hay đốm chói lóa từ đèn flash (glare) thường che khuất mặt giấy.
+**Yêu cầu cực kỳ khắt khe đặt ra là:** Thuật toán phải xử lý triệt để lớp bóng râm và các vùng chói này, đưa nền giấy về chuẩn trắng sáng, **nhưng tuyệt đối không được làm ảnh hưởng đến màu sắc gốc của văn bản.** Việc bảo toàn trọn vẹn màu sắc của con dấu đỏ hay chữ ký xanh là điều kiện tiên quyết để văn bản quét giữ được tính nguyên bản và giá trị pháp lý sử dụng."
 
 ---
 
-### SLIDE 4: TỔNG QUAN CÁC HƯỚNG NGHIÊN CỨU
+### SLIDE 4: TỔNG QUAN VÀ LÝ GIẢI HƯỚNG TIẾP CẬN
 **Lời thoại:** 
-"Giới nghiên cứu học thuật hiện nay giải quyết vòng lặp này qua 3 chốt chặn: Đầu tiên là Localization (Tìm góc giấy bằng Toán học hoặc Mạng Phân đoạn U-Net). Thứ hai là Dewarping (Nhào nặn uốn phẳng độ cong bằng Spline 3 chiều). Và chốt hạ cuối cùng là mảng Enhancement (Binarize phân ngưỡng cường độ sáng để lột xác điểm ảnh)."
+"Để giải quyết các bài toán trên, hiện nay có hai hướng tiếp cận phổ biến: Một là dùng các công vụ xử lý ảnh truyền thống (như OpenCV), ưu điểm là tính toán cực nhanh nhưng dễ thất bại khi nền phức tạp; Hai là sử dụng mô hình Học sâu (Deep Learning) toàn trình, rất thông minh trong nhận diện không gian nhưng lại hay làm biến dạng màu sắc và tính toán nặng nề. 
+Nhằm khắc phục các khuyết điểm trên, nhóm đã **lựa chọn hướng tiếp cận Lai (Hybrid Pipeline)**. Quyết định này kết hợp khả năng phân tích bối cảnh xuất sắc của AI và sự tinh tế trong việc tinh chỉnh màu sắc của các thuật toán xử lý ảnh số. Cụ thể, giải pháp đi qua 3 bước chuẩn mực: **Localization** (AI bóc tách nền), **Dewarping** (Cân chỉnh phối cảnh và nắn phẳng tài liệu cong) và kết thúc ở **Enhancement** (Tối ưu ánh sáng và phục hồi màu sắc gốc)."
 
 ---
 
-### SLIDE 5: GIỚI HẠN CỦA "SCANNER TRUYỀN THỐNG"
+### SLIDE 5: Giới hạn của sử dụng TRUYỀN THỐNG OPENCV
 **Lời thoại:** 
-"Và đây là rào cản tử huyệt của xử lý ảnh truyền thống. Nếu xài thuật toán Otsu (bổ ngưỡng toàn ảnh), nó sẽ ngay lập tức nhuộm đen xì toàn bộ những vùng bị bóng râm che lấp. 
-Khôn ngoan hơn một chút, người ta chuyển sang xài thuật toán Local Adaptive (Phân ngưỡng cục bộ). Nó quét qua được lớp bóng râm, tuy nhiên lưỡi dao cắt của nó quá độc đoản. Nó bào thủng những nét chữ nhạt mảnh, làm đứt gãy vành con chữ và đặc biệt là **NÓ ÉP TỬ MÀU SẮC**. Nó tước đoạt toàn bộ màu đỏ màu xanh thành các hạt pixel đen trắng nham nhở gai góc."
+"Ở giai đoạn đầu, nhóm đã thử nghiệm xử lý bài toán hoàn toàn bằng các thuật toán có sẵn của OpenCV. Thực tế ghi nhận giải pháp này chỉ đáp ứng tốt ở các điều kiện lý tưởng cực kỳ đơn giản: ví dụ như nhận diện một tờ giấy trắng tinh đặt trên một nền bàn trống trơn tương phản mạnh. 
+Tuy nhiên, khi đưa vào môi trường thực tế nhiễu loạn với nhiều góc độ và ánh sáng khác nhau, OpenCV thuần túy bộc lộ 3 nhược điểm chí mạng:
+Thứ nhất, thuật toán ngưỡng toàn cục (Otsu) lập tức thất bại. Các vùng chênh sáng bị bóng râm sẽ biến thành mảng nhiễu đen thui che lấp toàn bộ chữ.
+Thứ hai, nếu đổi sang ngưỡng cục bộ (Local Adaptive) để khắc phục bóng râm, thì viền nét cắt lại quá cứng nhắc, cắn xén đứt gãy các nét chữ ký mảnh.
+Và yếu huyệt lớn nhất thứ ba: Các phép toán trên đều ép bức hình phải chuyển về hệ nhị phân đen/trắng. Điều này đồng nghĩa với việc **đánh mất hoàn toàn màu sắc chân thực** của tài liệu — khiến con dấu đỏ hay chữ ký xanh bị tẩy màu xám xịt vô hồn."
 
 ---
 
-### SLIDE 6: MỤC TIÊU PHẠM VI DỰ ÁN
+### SLIDE 6: MỤC TIÊU VÀ PHẠM VI DỰ ÁN
 **Lời thoại:** 
-"Hiểu được nỗi đau đó, sứ mệnh của Pipeline Nhóm 6 cực kỳ rõ ràng: Đầu vào là một tấm ảnh thô cong vênh, rập bóng người thui lủi. Đầu ra kỳ vọng là một Text Layout quét vuông vức, nền trắng bóc trong vắt, nét mảnh đen ôm gọn gàng, và đặc biệt Con dấu đỏ vẫn phải sực mùi mực đỏ!"
+"Từ những thách thức trên, mục tiêu của dự án Nhóm 6 được định hình rất rõ ràng: Nhóm khao khát xây dựng một hệ thống giải pháp có khả năng nhận diện và căn chỉnh tự động tài liệu thông qua hình ảnh thu thập trực tiếp từ thiết bị di động cá nhân (Smartphone). 
+Yêu cầu cốt lõi là hệ thống phải xử lý tốt trong đa dạng các điều kiện ánh sáng và các tình trạng vật lý phức tạp của giấy tờ (nhăn, cong vênh, bóng đổ rải rác). 
+Đặc biệt, quy trình này không chỉ **tăng cường sắc nét độ tương phản** của chữ viết, mà còn bắt buộc **vẫn giữ gìn nguyên vẹn đặc trưng nét chữ, màu mực gốc và cái hồn chất liệu (texture) nguyên bản của mặt giấy.**
+Kết quả chuyên nghiệp đầu ra luôn hướng tới mục đích cao nhất: Đáp ứng xuất sắc toàn bộ quy chuẩn của công tác **số hóa chuyển đổi điện tử và lưu trữ tài liệu giấy tờ hàng ngày** trong đời sống và văn phòng."
 
 ---
 
 ### SLIDE 7: PHƯƠNG PHÁP TIẾP CẬN – SƠ ĐỒ PIPELINE
 **Lời thoại:** 
-"Để làm được điều đó, nhóm xây dựng bộ máy **Hybrid Pipeline**. 
-- Bước 1: Máy đóng vai trò là Sát Thủ Tuyến Đầu. Gọi AI (U²-Net hoặc DocAligner) tước lột thảm phông nền.
-- Bước 2: Dùng ma trận Perspective nắn chéo, và cầu viện AI UVDoc nắn thẳng dòng uốn lượn lõm gáy sách.
-- Bước 3: Đẩy về cho Toán học Không Gian OpenCV cầm cương dồn dập 4 lõi đả kích sắc độ."
+"Để đạt được mục tiêu này, nhóm xây dựng mô hình vòng lặp kết hợp **Hybrid Pipeline**. 
+- Bước 1: Sử dụng AI (như U²-Net hoặc DocAligner) để bóc tách tài liệu khỏi nền xung quanh.
+- Bước 2: Dùng ma trận phối cảnh (Perspective) để căn chỉnh phẳng, và kết hợp mô hình AI UVDoc để làm phẳng các tài liệu bị cong lượn như trang cuốn sách.
+- Bước 3: Áp dụng các thuật toán xử lý không gian màu của OpenCV để tối ưu hóa ánh sáng và tái tạo màu sắc."
 
 ---
 
-### SLIDE 8: CỐT LÕI ĐỘT PHÁ TĂNG CƯỜNG ÁNH SÁNG & BẢO TOÀN MÀU
+### SLIDE 8: ĐIỂM NHẤN TRONG TĂNG CƯỜNG ÁNH SÁNG & BẢO TOÀN MÀU
 **Lời thoại:** 
-"Xin phép hội đồng chú ý kỹ vào Thuật toán khâu Tăng cường màu sắc (Bước 3). Thay vì gộp bức ảnh về thang độ Xám rồi cày nát điểm ảnh, nhóm triển khai **Giải pháp Triệt Bóng Kênh Độc Lập RGB**.
-Chúng em tách mạch máu bức ảnh thành 3 kênh riêng biệt Đỏ, Lục, Lam. Thuật toán sẽ đúc một màng Gaussian làm giả mạo lớp bóng râm cho từng kênh. Sau đó lấy Ảnh Gốc Đem CHIA cho Ảnh Giả Mạo. 
-Nhờ cơ chế Tách Dòng (Channel-wise Division), vùng nền mờ mịt bị trung hòa đánh rỗng bốc hơi thành màu Trắng phau, **nhưng** đặc tính tần số thấp của Mực Đỏ và Ký Xanh không hề chạm ngưỡng bão hòa nên vẫn ngời ngợi chân thực 100%."
+"Xin phép hội đồng chú ý vào thuật toán tăng cường màu sắc ở Bước 3. Thay vì chuyển bức ảnh về ảnh xám thông thường, nhóm áp dụng **giải pháp xử lý bóng đổ trên từng kênh màu RGB độc lập**.
+Nhóm tách hình ảnh thành 3 kênh riêng biệt: Đỏ, Xanh lá, Xanh dương. Sử dụng bộ lọc làm mờ diện rộng (Gaussian) để ước lượng vùng bóng râm cho từng kênh, sau đó chuẩn hóa bằng cách chia ảnh gốc cho khung bóng râm vừa nội suy.
+Nhờ cơ chế này (Channel-wise Division), vùng nền tối được làm sáng và trở nên đồng đều, **trong khi** các chi tiết màu như các mộc đỏ hay chữ ký xanh vẫn giữ được độ sắc nét và màu sắc một cách độc lập chân thực."
 
 ---
 
-### SLIDE 9: SO SÁNH GIẢI PHÁP NHÓM VS. CV TRUYỀN THỐNG
+### SLIDE 9: SO SÁNH GIẢI PHÁP NHÓM VS. XỬ LÝ ẢNH TRUYỀN THỐNG
 **Lời thoại:** 
-"Do đó, khác với bộ định tuyến Canny (OpenCV gốc) dễ dàng bị chấn thương đứt đoạn bởi cái bàn có vân hoa sen rườm rà, Pipeline của nhóm gắp tờ giấy ra khỏi không gian nhờ "phân tích ngữ nghĩa" (đứa trẻ hiểu tờ giấy). Và khác với thuật toán cũ vắt kiệt sinh học màu sắc (Monochrome), giải pháp nhóm giữ trọn sinh khí của màu sắc sặc sỡ trên tài liệu."
+"So với phương pháp dò biên cạnh Canny của OpenCV truyền thống, vốn dễ bị nhiễu do phông nền đồ vật lộn xộn, thuật toán của nhóm có khả năng nhận diện vùng tài liệu hữu hiệu nhờ việc phân tích ngữ cảnh của mạng học sâu. Hơn nữa, thay vì chuyển đổi sang ảnh đơn sắc làm mất bản sắc gốc của tài liệu, giải pháp của nhóm ưu tiên duy trì thông tin màu sắc trọn vẹn của văn bản."
 
 ---
 
-### SLIDE 10: SO SÁNH CHUYÊN SÂU KHỐI APP THƯƠNG MẠI
+### SLIDE 10: SO SÁNH VỚI CÁC ỨNG DỤNG THƯƠNG MẠI
 **Lời thoại:** 
-"Nhìn sang các đế chế ứng dụng hiện hành như CamScanner hay Adobe Scan, họ có lợi thế là tốc độ cực kì bay bổng vì thuần túy xài CV (Toán ròng). Tuy nhiên, họ lại thất thủ hoàn toàn trước một quyển sách dày cộm lượn sóng võng gáy (do không có tư duy mạng Neuron cong 3D) và họ đang lạm dụng dập Binarize gắt mạnh bạo cắn mất nét chữ phai nhạt."
+"Khi so sánh với một số ứng dụng hiện hành như CamScanner hay Adobe Scan, các ứng dụng này có ưu thế về tốc độ xử lý nhanh. Tuy nhiên, chúng có thể gặp khó khăn với các tài liệu độ cong lớn (như gáy sách cuốn) hoặc thường áp dụng độ tương phản quá mạnh (Binarize gắt), dẫn đến việc đôi khi các nét mực bị mất đi."
 
 ---
 
-### SLIDE 11: ĐÁNH GIÁ MỨC TỐI ƯU CỦA THIẾT KẾ CẤU TRÚC
+### SLIDE 11: ĐÁNH GIÁ MỨC TỐI ƯU CỦA THIẾT KẾ
 **Lời thoại:** 
-"Thiết kế của nhóm đảm bảo sự giao thoa quyền lực tối ưu: Việc nhận thức sự méo mó, quăn góc, lượn sóng (Cái khó vĩ mô) dâng lên cho Trí Thuệ Nhân Tạo. Còn việc đan vá điểm ảnh xé mổ màu sắc (Cái khó vi mô) được OpenCV làm chủ vì chỉ có Toán Học gốc mới không đi "bù nhìn ảo giác". 
-Đặc biệt, hệ thống có **Rào Chắn Diện tích IoU**. Đưa tờ rơi phẳng vào, nó gạt AI qua một bên, áp chóp 4 góc siêu tốc. Đưa sách cong vào, nó mới mở vách ngăn AI kéo phẳng. Tiết kiệm hệ số tính toán rực rỡ!"
+"Thiết kế của nhóm đạt được sự phân bổ công việc hiệu quả: Các mô hình AI đảm nhận việc nhận diện hình dáng và xử lý độ uốn cong phức tạp, trong khi mảng kiến thức xử lý ảnh số truyền thống tinh chỉnh tối ưu ánh sáng và phục hồi màu sắc mảnh. 
+Ngoài ra hệ thống cũng linh động đánh giá tình trạng tài liệu. Với tài liệu thẳng phẳng, hệ thống xử lý cắt góc nhanh chóng; chỉ với tài liệu độ võng cao, mô hình AI nắn cong mới được kích hoạt, điều này giúp tối ưu hóa hệ số chi phí tính toán."
 
 ---
 
-### SLIDE 12: PHÂN TÍCH CHI PHÍ ĐIỆN TOÁN VÀ KHẢ THI ON-DEVICE
+### SLIDE 12: ĐÁNH GIÁ CHI PHÍ ĐIỆN TOÁN VÀ KHẢ THI TRÊN THIẾT BỊ DI ĐỘNG
 **Lời thoại:** 
-"Chi phí đắt đỏ của Deep Learning có phải là mộng tưởng trên Smartphone? Không thưa thầy cô! Khâu tách nền hiện nay xài NPU của Nano chỉ lốn $< 50ms$. Khâu nắn sóng ResNet UVDoc tương lai lượng tử hóa qua TFLite dung lượng nằm nệm dưới 40MB. Còn mảng mổ xẻ màu sắc của Bước 3 toàn tệp số NumPy vector hóa qua C++ Backend ngốn không tới 30ms. Khả năng bó cục hệ thống thành một App Offline 80 Megabytes không chạy Cloud là điều ở ngay trước mắt."
+"Về tính khả thi để hoạt động trơn tru trên thiết bị cá nhân, các khâu xử lý của hệ thống hiện tại rất ấn tượng. Khâu tách nền trên thiết bị di động chỉ mất khoảng dưới 50ms. Mô hình làm phẳng UVDoc có thể được lượng tử hóa (quantization) xuống dưới quy mô 40MB. Phương pháp hiệu chỉnh màu sắc đa phần tính toán ma trận với thời gian chưa tới 30ms. Đưa toàn bộ module này thiết lập thành ứng dụng ngoại tuyến (offline) dung lượng nhỏ là mục tiêu kỹ thuật hoàn toàn khả thi."
 
 ---
 
-### SLIDE 13: KẾT QUẢ THỰC NGHIỆM STEP 1 & 2
+### SLIDE 13: KẾT QUẢ THỰC NGHIỆM - BƯỚC 1 & 2
 **Lời thoại:** 
-"Đến với phần thực nghiệm: Hình 1 là giấy dán trên một thảm len bề bộn rác chụp trong môi trường phòng tối. Trải qua lớp lọc đầu tiên, nó khước từ hoàn toàn vân len cuộn, gạt tay người chặn giấy, bắn vút vào hệ thống lưới để ép mép quăn mượt mà như 1 dao cạy."
+"Xin mời thầy cô quan sát kết quả thực nghiệm: Hình bên trái là tài liệu đặt trên nền thảm xáo trộn và có nhiễu bởi tay người dùng. Trải qua các thuật toán căn chỉnh, hệ thống đã loại bỏ được hậu cảnh dư thừa, bỏ qua tay bị lẹm trên góc, và căn chỉnh tự động tài liệu về mặt phẳng vuông trịa."
 
 ---
 
-### SLIDE 14: KẾT QUẢ THỰC NGHIỆM ĐÁNH LÓA & RUNG NHÒE
+### SLIDE 14: KẾT QUẢ THỰC NGHIỆM - XỬ LÝ CHÓI MÀU & RUNG NHÒE
 **Lời thoại:** 
-"Đây là zoom cận cảnh Macro điểm ảnh. Tia đèn flash trắng khoét một lỗ kim chói giữa mép chữ. Phép Inpainting lập tức túm thịt xung quanh vá kín miệng vết thương. Kế bên, vết quẹt nét rung tay bay màu đuôi chữ được đập dập, cắt gọn cạo vành sắc tứa mạnh bạo (Unsharp Masking)."
+"Tiếp theo là đánh giá cận cảnh phần nét chữ. Đối với các vùng bị loá do đèn flash thiết bị (chói khoét trắng), hệ thống áp dụng kỹ thuật Inpainting để phục hồi dữ liệu bị hư hại. Tại vùng lỗi nét chữ rung nhòe, hệ thống tăng độ sắc viền nét (Unsharp Masking) giúp chữ đậm và rõ ràng trở lại."
 
 ---
 
-### SLIDE 15: KẾT QUẢ TRIỆT TIÊU BÓNG LOANG (BẢO TOÀN MÀU CỐT LÕI)
+### SLIDE 15: KẾT QUẢ TRIỆT TIÊU BÓNG LOANG VÀ BẢO TOÀN MÀU
 **Lời thoại:** 
-"Đây là thành tựu cốt lõi nhất hồi nãy em có đề cập: Ở bức hình bên trái, mảng bóng đổ tay người hắt tối rù rì chím lấp một nửa sấp văn bản. 
-Và bum! Ở hình bên phải, với Division Shadow Normalization, ánh sáng được thổi tung tản băng 100% tờ giấy. Chữ đen nháy. Và quý thầy cô hãy zoom thẳng vào **con dấu đỏ thẫm** và **mực ký xanh**. Tông màu nguyên thủy cực kỳ rực rỡ. Không có bất cứ 1 vết răng cưa đen xám hay ám tím ảo ảnh (color halo) nào đọng lại quanh chữ ký. Chuẩn pháp lý cực kỳ nguyên vẹn!"
+"Đây là kết quả trọng điểm của dự án: Ở bức hình bên trái, mảng tối từ tay người đã hắt lệch ánh sáng tạo bóng lên văn bản. 
+Nhìn sang bức ảnh bên phải, biểu đồ bóng râm được chuẩn hoá thành công mang lại diện mạo trắng đồng đều. 
+Đồng thời, khi quan sát kỹ **họa tiết con dấu đỏ** và **nét mực ký xanh**, màu sắc hiển thị rất tự nhiên, rực rỡ và giữ nguyên hình thái gốc; không bị lẫn mảng tối, đốm xám hay hiện tượng loang màu."
 
 ---
 
-### SLIDE 16: ĐỈNH CHÓP SỨC MẠNH KÍCH MỀM BINARIZE
+### SLIDE 16: CHI TIẾT ĐỘ MƯỢT NÉT CHỮ
 **Lời thoại:** 
-"Khi soi cặn kẽ nét chữ binarize (ảnh xám đen): Ở mép ngoài, đường rãnh Binarize Otsu xé rỗ thủng rạn nứt cọc cạch. Còn bên phương án Soft-Thresholding của nhóm, vành nét chữ được bọc một con đệm sương mờ Anti-Aliasing (xám tuyến tính) bao thắt bụng mực cốt đen tuyền. Chữ rất mượt mà trong trạng thái siêu rõ."
+"Khi quan sát kỹ hơn chất lượng đường nét ký tự: Các phương pháp nhị phân đơn thuần thường làm nét chữ bị răng cưa, gai góc. Còn với tiếp cận ngưỡng mềm (Soft-Thresholding) của nhóm, viền chữ được bao bọc sự chuyển tiếp mềm mại (Anti-Aliasing). Nhờ đó tạo ra đường nét mượt mà và cảm nhận nguyên bản như bản in."
 
 ---
 
-### SLIDE 17: KẾT LUẬN TỔNG THỂ & HƯỚNG MỞ QUY MÔ
+### SLIDE 17: KẾT LUẬN & HƯỚNG PHÁT TRIỂN
 **Lời thoại:** 
-"Tóm lại: Đồ án là minh chứng cho sự ưu việt của việc Không Giam Hãm bản thân vào 1 phe rập khuôn rỗng tuếch. Tái cơ cấu AI thay cho mặt trận dò góc, và Tôn tạo giữ nguyên OpenCV mài dũa độ nét (Bảo tồn sinh học màu sắc), đồ án đã tạo ra một buồng máy Scan thực chiến kinh hoàng. Hướng tiếp tục của nhóm: Lượng tử hóa file Nơ-ron và bó trọn vào lõi Di Động App Native."
+"Trình bày trên cho thấy hệ thống đồ án đã tối ưu khả năng kết hợp đa phương pháp: Sự ưu việt của mạng học sâu trong việc nhận dạng ranh giới cùng kỹ năng tinh giảm ảnh hưởng mảng sáng-tối từ OpenCV.
+Mục tiêu tương lai của nhóm sẽ là nén hiệu suất các mô hình thuật toán học sâu để chạy đa luồng linh hoạt và tích hợp tất cả vào phần mềm máy quét đi động trực tiếp (App native)."
